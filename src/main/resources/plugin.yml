@@ -1,0 +1,6 @@
+name: apt-mc
+version: '1.0'
+main: io.github.Earth1283.aptMc.AptMc
+api-version: '1.21'
+load: STARTUP
+authors: [ Earth1283 ]
