@@ -11,7 +11,7 @@
 -   **🔄 Upgrade System**: 
     -   `apt upgrade` checks all installed plugins against Modrinth.
     -   Downloads updates to the `update/` folder for safe installation on restart.
-    -   Smartly handles file replacement.
+    -   Intelligently  handles file replacement.
 -   **⚡ High Performance**:
     -   **Parallel Processing**: Downloads and API checks run asynchronously and in parallel.
     -   **Persistent Caching**: Caches plugin metadata to `plugins/apt-mc/cache.json` to minimize API limits and speed up commands.
