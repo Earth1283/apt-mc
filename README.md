@@ -1,6 +1,6 @@
 # apt-mc
 
-**The Advanced Packaging Tool for Minecraft Servers.**
+**The Advanced Packaging Tool for Minecraft Servers, made with pure spite.**
 
 `apt-mc` is a Spigot/Paper plugin that brings the familiar `apt` command-line experience to Minecraft server management. It allows you to search, install, upgrade, and manage plugins directly from the game chat or server console, powered by the [Modrinth API](https://modrinth.com/).
 
