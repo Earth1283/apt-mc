@@ -17,8 +17,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -33,8 +35,8 @@ public class AptCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (args.length == 0) {
-            sender.sendMessage(Component.text("apt-mc: The Advanced Packaging Tool for Minecraft Servers.", NamedTextColor.GREEN));
+        if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
+            sendHelp(sender);
             return true;
         }
 
@@ -66,7 +68,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                         handleRemove(sender, subArgs);
                         break;
                     default:
-                        sender.sendMessage(Component.text("Unknown command: " + subCommand, NamedTextColor.RED));
+                        sender.sendMessage(Component.text("Unknown command: " + subCommand + ". Use /apt help for usage.", NamedTextColor.RED));
                 }
             } catch (Exception e) {
                 sender.sendMessage(Component.text("Error executing command: " + e.getMessage(), NamedTextColor.RED));
@@ -75,6 +77,17 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         });
 
         return true;
+    }
+
+    private void sendHelp(CommandSender sender) {
+        sender.sendMessage(Component.text("apt-mc Usage Guide:", NamedTextColor.GOLD, TextDecoration.BOLD));
+        sender.sendMessage(Component.text("/apt install <pkg1> [pkg2]...", NamedTextColor.YELLOW).append(Component.text(" - Install plugins", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt remove <pkg>", NamedTextColor.YELLOW).append(Component.text(" - Remove a plugin", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt upgrade", NamedTextColor.YELLOW).append(Component.text(" - Upgrade all plugins", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt search <query>", NamedTextColor.YELLOW).append(Component.text(" - Search Modrinth", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt info <pkg>", NamedTextColor.YELLOW).append(Component.text(" - View plugin details", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt list", NamedTextColor.YELLOW).append(Component.text(" - List installed plugins", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt update", NamedTextColor.YELLOW).append(Component.text(" - Update index (simulated)", NamedTextColor.WHITE)));
     }
 
     private void handleInfo(CommandSender sender, List<String> args) {
@@ -235,6 +248,52 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private Set<String> getInstalledProjectIds() {
+        Map<String, String> installed = packageManager.getInstalledPlugins();
+        Map<String, JsonObject> resolved = resolveVersions(new ArrayList<>(installed.values()));
+        Set<String> ids = new HashSet<>();
+        for (JsonObject v : resolved.values()) {
+            ids.add(v.get("project_id").getAsString());
+        }
+        return ids;
+    }
+
+    private void resolveDependenciesRecursive(CommandSender sender, JsonObject project, Map<String, JsonObject> toInstall, Set<String> installedIds) {
+        String id = project.get("id").getAsString();
+        String slug = project.get("slug").getAsString();
+        
+        if (installedIds.contains(id) || toInstall.containsKey(id)) return;
+        
+        toInstall.put(id, project);
+        
+        try {
+            JsonArray versions = ModrinthAPI.getVersions(id, List.of("spigot", "paper", "purpur", "bukkit"));
+            if (versions.size() > 0) {
+                JsonObject latest = versions.get(0).getAsJsonObject();
+                JsonArray deps = latest.getAsJsonArray("dependencies");
+                if (deps != null) {
+                    for (JsonElement d : deps) {
+                        JsonObject depObj = d.getAsJsonObject();
+                        if (depObj.has("dependency_type") && depObj.get("dependency_type").getAsString().equals("required")) {
+                            if (depObj.has("project_id") && !depObj.get("project_id").isJsonNull()) {
+                                String depId = depObj.get("project_id").getAsString();
+                                if (!installedIds.contains(depId) && !toInstall.containsKey(depId)) {
+                                    sendStatus(sender, Component.text("Resolving dependency: " + depId, NamedTextColor.GRAY));
+                                    JsonObject depProj = ModrinthAPI.getProject(depId);
+                                    if (depProj != null) {
+                                        resolveDependenciesRecursive(sender, depProj, toInstall, installedIds);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            sender.sendMessage(Component.text("W: Failed to resolve dependencies for " + slug + ": " + e.getMessage(), NamedTextColor.YELLOW));
+        }
+    }
+
     private void handleInstall(CommandSender sender, List<String> args) {
         if (args.isEmpty()) {
             sender.sendMessage(Component.text("E: No packages specified.", NamedTextColor.RED));
@@ -245,26 +304,28 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         sendStatus(sender, Component.text("Reading package lists... Done", NamedTextColor.GREEN));
         sendStatus(sender, Component.text("Building dependency tree... Done", NamedTextColor.GREEN));
 
-        List<CompletableFuture<JsonObject>> projectFutures = args.stream()
-                .map(pkgSlug -> CompletableFuture.supplyAsync(() -> {
-                    try {
-                        sendStatus(sender, Component.text("Check " + pkgSlug + "...", NamedTextColor.WHITE));
-                        return ModrinthAPI.getProject(pkgSlug);
-                    } catch (Exception e) {
-                        sender.sendMessage(Component.text("E: Error checking " + pkgSlug + ": " + e.getMessage(), NamedTextColor.RED));
-                        return null;
-                    }
-                }))
-                .collect(Collectors.toList());
+        Set<String> installedIds = getInstalledProjectIds();
+        Map<String, JsonObject> toInstallMap = new HashMap<>();
 
-        CompletableFuture.allOf(projectFutures.toArray(new CompletableFuture[0])).join();
+        for (String pkgSlug : args) {
+            try {
+                sendStatus(sender, Component.text("Check " + pkgSlug + "...", NamedTextColor.WHITE));
+                JsonObject project = ModrinthAPI.getProject(pkgSlug);
+                if (project != null) {
+                    resolveDependenciesRecursive(sender, project, toInstallMap, installedIds);
+                } else {
+                    sender.sendMessage(Component.text("E: Unable to locate package " + pkgSlug, NamedTextColor.RED));
+                }
+            } catch (Exception e) {
+                sender.sendMessage(Component.text("E: Error checking " + pkgSlug + ": " + e.getMessage(), NamedTextColor.RED));
+            }
+        }
 
-        List<JsonObject> toInstall = projectFutures.stream()
-                .map(CompletableFuture::join)
-                .filter(p -> p != null)
-                .collect(Collectors.toList());
-
-        if (toInstall.isEmpty()) return;
+        List<JsonObject> toInstall = new ArrayList<>(toInstallMap.values());
+        if (toInstall.isEmpty()) {
+            sender.sendMessage(Component.text("All packages already installed or not found.", NamedTextColor.YELLOW));
+            return;
+        }
 
         sender.sendMessage(Component.text("\nThe following NEW packages will be installed:", NamedTextColor.WHITE));
         for (JsonObject pkg : toInstall) {
@@ -466,7 +527,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("info", "list", "update", "search", "install", "upgrade", "remove");
+            return Arrays.asList("info", "list", "update", "search", "install", "upgrade", "remove", "help");
         }
         return Collections.emptyList();
     }
