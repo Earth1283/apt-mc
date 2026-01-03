@@ -7,7 +7,8 @@ public final class AptMc extends JavaPlugin {
     @Override
     public void onEnable() {
         // Plugin startup logic
-
+        saveDefaultConfig();
+        getCommand("apt").setExecutor(new AptCommand(this));
     }
 
     @Override

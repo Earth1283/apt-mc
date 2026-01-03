@@ -1,0 +1,6 @@
+# Whether to use the action bar for status updates and progress bars.
+# Set to false to force all output to the chat.
+use-action-bar: true
+
+# Interval in seconds to update progress in the console.
+console-progress-interval: 5
