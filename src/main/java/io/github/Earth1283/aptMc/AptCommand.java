@@ -374,7 +374,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         }
 
         if (plugin.getConfig().getBoolean("apt-song-references")) {
-            sender.sendMessage(Component.text("Apateu, apateu! ...fine, installing your stuff.", NamedTextColor.LIGHT_PURPLE));
+            sender.sendMessage(Component.text(getRandomAptQuote(), NamedTextColor.LIGHT_PURPLE));
         }
 
         sender.sendMessage(Component.text("\nThe following NEW packages will be installed:", NamedTextColor.WHITE));
@@ -420,6 +420,18 @@ public class AptCommand implements CommandExecutor, TabCompleter {
 
         CompletableFuture.allOf(installFutures.toArray(new CompletableFuture[0])).join();
         sender.sendMessage(Component.text("Installation complete. Restart server to apply changes.", NamedTextColor.GOLD));
+    }
+
+    private String getRandomAptQuote() {
+        List<String> quotes = Arrays.asList(
+            "Apateu makes you wake up on the ground. apt-mc makes you wake up to a complete server.",
+            "Kissy face, kissy face... sent to your console log.",
+            "Sleep tomorrow, but I install tonight.",
+            "Turn this apateu into a server.",
+            "Don't you want me like I want you... to handle your dependencies?",
+            "Apateu, apateu! ...fine, installing your stuff."
+        );
+        return quotes.get(new java.util.Random().nextInt(quotes.size()));
     }
 
     private void handleUpgrade(CommandSender sender) {
