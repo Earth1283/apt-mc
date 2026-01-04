@@ -80,6 +80,9 @@ public class AptCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
+        if (plugin.getConfig().getBoolean("apt-song-references")) {
+             sender.sendMessage(Component.text("\u266A Apateu, apateu! \u266A ... (I am a serious tool, you know)", NamedTextColor.LIGHT_PURPLE));
+        }
         sender.sendMessage(Component.text("apt-mc Usage Guide:", NamedTextColor.GOLD, TextDecoration.BOLD));
         sender.sendMessage(Component.text("/apt install <pkg1> [pkg2]...", NamedTextColor.YELLOW).append(Component.text(" - Install plugins", NamedTextColor.WHITE)));
         sender.sendMessage(Component.text("/apt remove <pkg>", NamedTextColor.YELLOW).append(Component.text(" - Remove a plugin", NamedTextColor.WHITE)));
@@ -208,6 +211,49 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         sendStatus(sender, Component.text("Reading package lists... Done", NamedTextColor.GREEN));
         sendStatus(sender, Component.text("Building dependency tree... Done", NamedTextColor.GREEN));
         sendStatus(sender, Component.text("Reading state information... Done", NamedTextColor.GREEN));
+
+        // Self-update check
+        try {
+            sendStatus(sender, Component.text("Checking for self-updates (apt-mc)...", NamedTextColor.WHITE));
+            JsonObject project = ModrinthAPI.getProject("apt-mc");
+            if (project != null) {
+                String projectId = project.get("id").getAsString();
+                JsonArray versions = ModrinthAPI.getVersions(projectId, List.of("spigot", "paper", "purpur", "bukkit"));
+                
+                if (versions.size() > 0) {
+                    JsonObject latest = versions.get(0).getAsJsonObject();
+                    String latestVer = latest.get("version_number").getAsString();
+                    String currentVer = plugin.getDescription().getVersion();
+
+                    if (!latestVer.equalsIgnoreCase(currentVer)) {
+                        sendStatus(sender, Component.text("New version found: " + latestVer + " (Current: " + currentVer + ")", NamedTextColor.GREEN));
+                        
+                        JsonArray files = latest.getAsJsonArray("files");
+                        if (files.size() > 0) {
+                            JsonObject primaryFile = files.get(0).getAsJsonObject();
+                            for(JsonElement f : files) {
+                                if (f.getAsJsonObject().has("primary") && f.getAsJsonObject().get("primary").getAsBoolean()) {
+                                    primaryFile = f.getAsJsonObject();
+                                    break;
+                                }
+                            }
+                            
+                            String url = primaryFile.get("url").getAsString();
+                            String filename = primaryFile.get("filename").getAsString();
+                            long size = primaryFile.get("size").getAsLong();
+                            
+                            sendStatus(sender, Component.text("Downloading update...", NamedTextColor.BLUE));
+                            packageManager.downloadFile(url, packageManager.getUpdateDir(), filename, size, createProgressCallback(sender, filename));
+                            sendStatus(sender, Component.text("Update downloaded. Restart server to apply.", NamedTextColor.GOLD));
+                            return;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+             sender.sendMessage(Component.text("W: Failed to check self-update: " + e.getMessage(), NamedTextColor.YELLOW));
+        }
+
         sender.sendMessage(Component.text("All packages are up to date.", NamedTextColor.WHITE));
     }
 
@@ -325,6 +371,10 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         if (toInstall.isEmpty()) {
             sender.sendMessage(Component.text("All packages already installed or not found.", NamedTextColor.YELLOW));
             return;
+        }
+
+        if (plugin.getConfig().getBoolean("apt-song-references")) {
+            sender.sendMessage(Component.text("Apateu, apateu! ...fine, installing your stuff.", NamedTextColor.LIGHT_PURPLE));
         }
 
         sender.sendMessage(Component.text("\nThe following NEW packages will be installed:", NamedTextColor.WHITE));

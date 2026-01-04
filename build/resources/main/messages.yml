@@ -1,0 +1,21 @@
+prefix: "&6[apt-mc] &f"
+usage:
+  header: "&6&lapt-mc Usage Guide:"
+  install: "&e/apt install <pkg1> [pkg2]... &f- Install plugins"
+  remove: "&e/apt remove <pkg> &f- Remove a plugin"
+  upgrade: "&e/apt upgrade &f- Upgrade all plugins"
+  search: "&e/apt search <query> &f- Search Modrinth"
+  info: "&e/apt info <pkg> &f- View plugin details"
+  list: "&e/apt list &f- List installed plugins"
+  update: "&e/apt update &f- Update index (simulated)"
+errors:
+  unknown-command: "&cUnknown command: %s. Use /apt help for usage."
+  execution-error: "&cError executing command: %s"
+  package-not-found: "&cE: Unable to locate package %s"
+  no-permission: "&cYou do not have permission to use this command."
+status:
+  installed: "&aInstalled"
+  not-installed: "&cNot Installed"
+  downloading: "&9Downloading %s..."
+  downloaded: "&aDownloaded %s"
+  up-to-date: "&fAll packages are up to date."

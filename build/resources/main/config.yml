@@ -4,3 +4,6 @@ use-action-bar: true
 
 # Interval in seconds to update progress in the console.
 console-progress-interval: 5
+
+# Enable references to the song "APT." by Rosé & Bruno Mars
+apt-song-references: true
