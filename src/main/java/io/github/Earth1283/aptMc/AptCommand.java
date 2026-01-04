@@ -10,9 +10,12 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -67,6 +70,12 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                     case "remove":
                         handleRemove(sender, subArgs);
                         break;
+                    case "export":
+                        handleExport(sender, subArgs);
+                        break;
+                    case "import":
+                        handleImport(sender, subArgs);
+                        break;
                     default:
                         sender.sendMessage(Component.text("Unknown command: " + subCommand + ". Use /apt help for usage.", NamedTextColor.RED));
                 }
@@ -90,7 +99,9 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/apt search <query>", NamedTextColor.YELLOW).append(Component.text(" - Search Modrinth", NamedTextColor.WHITE)));
         sender.sendMessage(Component.text("/apt info <pkg>", NamedTextColor.YELLOW).append(Component.text(" - View plugin details", NamedTextColor.WHITE)));
         sender.sendMessage(Component.text("/apt list", NamedTextColor.YELLOW).append(Component.text(" - List installed plugins", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt update", NamedTextColor.YELLOW).append(Component.text(" - Update index (simulated)", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt update", NamedTextColor.YELLOW).append(Component.text(" - Update index", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt export [file]", NamedTextColor.YELLOW).append(Component.text(" - Export state", NamedTextColor.WHITE)));
+        sender.sendMessage(Component.text("/apt import [file]", NamedTextColor.YELLOW).append(Component.text(" - Import state", NamedTextColor.WHITE)));
     }
 
     private void handleInfo(CommandSender sender, List<String> args) {
@@ -506,14 +517,6 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                         }
                     }
                     
-                    // Try to remove old file
-                    File oldFile = new File(packageManager.getPluginsDir(), up.filename);
-                    if (oldFile.exists()) {
-                        if (!oldFile.delete()) {
-                             sender.sendMessage(Component.text("W: Could not delete " + up.filename + ". New version will be in update folder.", NamedTextColor.YELLOW));
-                        }
-                    }
-                    
                     // Download new to update folder
                     try {
                         packageManager.downloadFile(primaryFile.get("url").getAsString(), packageManager.getUpdateDir(), primaryFile.get("filename").getAsString(), primaryFile.get("size").getAsLong(), createProgressCallback(sender, up.filename));
@@ -545,6 +548,150 @@ public class AptCommand implements CommandExecutor, TabCompleter {
             this.currentVersion = currentVersion;
             this.newVersion = newVersion;
             this.latestObj = latestObj;
+        }
+    }
+
+    private void handleExport(CommandSender sender, List<String> args) {
+        String filename = args.isEmpty() ? "apt-manifest.yml" : args.get(0);
+        if (!filename.endsWith(".yml")) filename += ".yml";
+        File file = new File(plugin.getDataFolder(), filename);
+        
+        sendStatus(sender, Component.text("Exporting state to " + filename + "...", NamedTextColor.YELLOW));
+        
+        Map<String, String> installed = packageManager.getInstalledPlugins();
+        if (installed.isEmpty()) {
+             sender.sendMessage(Component.text("No plugins installed to export.", NamedTextColor.RED));
+             return;
+        }
+
+        Map<String, JsonObject> versions = resolveVersions(new ArrayList<>(installed.values()));
+        FileConfiguration yaml = new YamlConfiguration();
+        
+        // Add Header
+        yaml.set("project-details.title", "Server Export");
+        yaml.set("project-details.author", sender.getName());
+        
+        int count = 0;
+        for (Map.Entry<String, String> entry : installed.entrySet()) {
+            String pluginFilename = entry.getKey();
+            String sha1 = entry.getValue();
+            
+            if (versions.containsKey(sha1)) {
+                JsonObject v = versions.get(sha1);
+                String projectId = v.get("project_id").getAsString();
+                String verNum = v.get("version_number").getAsString();
+                String name = pluginFilename.endsWith(".jar") ? pluginFilename.substring(0, pluginFilename.length() - 4) : pluginFilename;
+                
+                yaml.set("plugins." + name, "modrinth:" + projectId + "/" + verNum);
+                count++;
+            }
+        }
+        
+        try {
+            yaml.save(file);
+             sender.sendMessage(Component.text("Exported " + count + " plugins to " + file.getPath(), NamedTextColor.GREEN));
+        } catch (IOException e) {
+             sender.sendMessage(Component.text("E: Failed to save manifest: " + e.getMessage(), NamedTextColor.RED));
+        }
+    }
+
+    private void handleImport(CommandSender sender, List<String> args) {
+        String filename = args.isEmpty() ? "apt-manifest.yml" : args.get(0);
+        if (!filename.endsWith(".yml")) filename += ".yml";
+        File file = new File(plugin.getDataFolder(), filename);
+        
+        if (!file.exists()) {
+             sender.sendMessage(Component.text("E: Manifest file not found: " + filename, NamedTextColor.RED));
+             return;
+        }
+
+        FileConfiguration yaml = YamlConfiguration.loadConfiguration(file);
+        if (!yaml.contains("plugins")) {
+             sender.sendMessage(Component.text("E: Invalid manifest format (no 'plugins' section).", NamedTextColor.RED));
+             return;
+        }
+        
+        sender.sendMessage(Component.text("Reading manifest...", NamedTextColor.WHITE));
+        
+        if (yaml.contains("project-details")) {
+            String title = yaml.getString("project-details.title", "Unknown Project");
+            String author = yaml.getString("project-details.author", "Unknown Author");
+            sender.sendMessage(Component.text("Importing project: ", NamedTextColor.WHITE)
+                    .append(Component.text(title, NamedTextColor.GREEN))
+                    .append(Component.text(" by ", NamedTextColor.WHITE))
+                    .append(Component.text(author, NamedTextColor.YELLOW)));
+        }
+        
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        // Use an array to count updates inside lambda
+        final int[] installedCount = {0};
+        
+        for (String key : yaml.getConfigurationSection("plugins").getKeys(false)) {
+            String val = yaml.getString("plugins." + key);
+            if (val == null || !val.startsWith("modrinth:")) continue;
+            
+            String[] parts = val.substring(9).split("/");
+            if (parts.length < 2) continue;
+            
+            String projectId = parts[0];
+            String versionNum = parts[1];
+            
+            futures.add(CompletableFuture.runAsync(() -> {
+                try {
+                    JsonArray verList = ModrinthAPI.getVersions(projectId, List.of("spigot", "paper", "purpur", "bukkit"));
+                    JsonObject targetVer = null;
+                    if (verList != null && verList.size() > 0) {
+                        if (versionNum.equalsIgnoreCase("latest")) {
+                             targetVer = verList.get(0).getAsJsonObject();
+                        } else {
+                            for(JsonElement e : verList) {
+                                if (e.getAsJsonObject().get("version_number").getAsString().equals(versionNum)) {
+                                    targetVer = e.getAsJsonObject();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (targetVer == null) {
+                         sender.sendMessage(Component.text("W: Version " + versionNum + " not found for " + projectId, NamedTextColor.YELLOW));
+                         return;
+                    }
+                    
+                    JsonArray files = targetVer.getAsJsonArray("files");
+                    if (files.size() == 0) return;
+                    
+                    JsonObject primary = files.get(0).getAsJsonObject();
+                    for(JsonElement f : files) {
+                        if (f.getAsJsonObject().has("primary") && f.getAsJsonObject().get("primary").getAsBoolean()) {
+                            primary = f.getAsJsonObject();
+                            break;
+                        }
+                    }
+                    
+                    String fileName = primary.get("filename").getAsString();
+                    String url = primary.get("url").getAsString();
+                    long size = primary.get("size").getAsLong();
+                    
+                    File targetFile = new File(packageManager.getPluginsDir(), fileName);
+                    if (!targetFile.exists()) {
+                         sendStatus(sender, Component.text("Downloading " + fileName + "...", NamedTextColor.BLUE));
+                         packageManager.downloadFile(url, packageManager.getPluginsDir(), fileName, size, createProgressCallback(sender, fileName));
+                         sendStatus(sender, Component.text("Installed " + fileName, NamedTextColor.GREEN));
+                         synchronized(installedCount) { installedCount[0]++; }
+                    }
+                } catch (Exception e) {
+                    sender.sendMessage(Component.text("E: Failed to install " + key + ": " + e.getMessage(), NamedTextColor.RED));
+                }
+            }));
+        }
+        
+        if (futures.isEmpty()) {
+            sender.sendMessage(Component.text("All plugins from manifest are already installed.", NamedTextColor.GREEN));
+        } else {
+            sender.sendMessage(Component.text("Installing " + installedCount[0] + " plugins...", NamedTextColor.WHITE));
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            sender.sendMessage(Component.text("Import complete. Restart server to apply changes.", NamedTextColor.GOLD));
         }
     }
 
@@ -589,7 +736,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("info", "list", "update", "search", "install", "upgrade", "remove", "help");
+            return Arrays.asList("info", "list", "update", "search", "install", "upgrade", "remove", "help", "export", "import");
         }
         return Collections.emptyList();
     }

@@ -12,6 +12,10 @@
     -   `apt upgrade` checks all installed plugins against Modrinth.
     -   Downloads updates to the `update/` folder for safe installation on restart.
     -   Intelligently  handles file replacement.
+-   **📋 State Management**:
+    -   **Export**: Save your server's plugin state to a YAML file for backup or replication.
+    -   **Import**: Restore a server's state or replicate a setup on a new server with one command.
+    -   **Portable Format**: Uses simple identifiers (e.g., `modrinth:viaversion/5.2.1`) for easy sharing.
 -   **⚡ High Performance**:
     -   **Parallel Processing**: Downloads and API checks run asynchronously and in parallel.
     -   **Persistent Caching**: Caches plugin metadata to `plugins/apt-mc/cache.json` to minimize API limits and speed up commands.
@@ -30,6 +34,8 @@
 | `/apt search <query>` | Searches Modrinth for plugins. |
 | `/apt list` | Lists installed plugins and their versions (resolved via Modrinth). |
 | `/apt info <plugin>` | Shows detailed metadata, author, and dependencies for a plugin. |
+| `/apt export [file]` | Exports the current plugin state to a YAML manifest (default: `apt-manifest.yml`). |
+| `/apt import [file]` | Imports and installs plugins from a YAML manifest. |
 
 ## Configuration
 
@@ -42,6 +48,26 @@ use-action-bar: true
 
 # Interval in seconds to update progress in the console.
 console-progress-interval: 5
+
+# Enable references to the song "APT." by Rosé & Bruno Mars
+apt-song-references: true
+```
+
+## Manifest Format
+
+The export file uses a simple YAML structure, allowing you to manually define plugins by Project ID or version.
+
+```yaml
+project-details:
+  title: My Server
+  author: Admin
+
+plugins:
+  # Install specific version
+  ViaVersion: "modrinth:viaversion/5.2.1"
+  
+  # Install latest version
+  Sodium: "modrinth:sodium/latest"
 ```
 
 ## Installation
