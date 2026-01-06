@@ -22,7 +22,12 @@ public final class AptMc extends JavaPlugin {
         updateConfig("config.yml");
         updateConfig("messages.yml");
         
-        getCommand("apt").setExecutor(new AptCommand(this));
+        AptCommand aptCommand = new AptCommand(this);
+        ConfirmationListener confirmationListener = new ConfirmationListener(this, aptCommand);
+        aptCommand.setConfirmationListener(confirmationListener);
+        getServer().getPluginManager().registerEvents(confirmationListener, this);
+        
+        getCommand("apt").setExecutor(aptCommand);
     }
 
     @Override

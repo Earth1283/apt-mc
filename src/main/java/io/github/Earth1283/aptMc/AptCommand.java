@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -21,10 +22,15 @@ import java.util.stream.Collectors;
 public class AptCommand implements CommandExecutor, TabCompleter {
     private final AptMc plugin;
     private final PackageManager packageManager;
+    private ConfirmationListener confirmationListener;
 
     public AptCommand(AptMc plugin) {
         this.plugin = plugin;
         this.packageManager = new PackageManager(plugin.getDataFolder(), plugin.getDataFolder().getParentFile());
+    }
+
+    public void setConfirmationListener(ConfirmationListener confirmationListener) {
+        this.confirmationListener = confirmationListener;
     }
 
     @Override
@@ -92,7 +98,6 @@ public class AptCommand implements CommandExecutor, TabCompleter {
             }
 
             Map<String, String> installedPlugins = packageManager.getInstalledPlugins();
-            String status = "Not Installed";
             String statusKey = "status.not-installed";
 
             if (!installedPlugins.isEmpty()) {
@@ -394,6 +399,54 @@ public class AptCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
+        // Remote install check
+        if (args.size() == 1 && args.get(0).matches("^(http|https|ftp)://.*\\.yml$")) {
+            String url = args.get(0);
+            try {
+                sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", "manifest")));
+                File tempDir = new File(plugin.getDataFolder(), "temp");
+                if (!tempDir.exists()) tempDir.mkdirs();
+                File tempFile = new File(tempDir, "remote_import_" + System.currentTimeMillis() + ".yml");
+                
+                // Use HttpClient for robust downloading with User-Agent
+                java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+                java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(url))
+                        .header("User-Agent", "apt-mc/1.2 (parody-cli)")
+                        .GET()
+                        .build();
+
+                java.net.http.HttpResponse<java.nio.file.Path> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofFile(tempFile.toPath()));
+                
+                if (response.statusCode() != 200) {
+                    sender.sendMessage(plugin.getMessage("errors.fetch-manifest-failed", Placeholder.unparsed("error", "HTTP " + response.statusCode())));
+                    return;
+                }
+
+                if (!tempFile.exists() || tempFile.length() == 0) {
+                    sender.sendMessage(plugin.getMessage("errors.fetch-manifest-failed", Placeholder.unparsed("error", "File empty or missing")));
+                    return;
+                }
+                
+                FileConfiguration yaml = YamlConfiguration.loadConfiguration(tempFile);
+                String title = yaml.getString("project-details.title", "Unknown");
+                String author = yaml.getString("project-details.author", "Unknown");
+                
+                sender.sendMessage(plugin.getMessage("status.import-header", Placeholder.unparsed("title", title), Placeholder.unparsed("author", author)));
+                sender.sendMessage(plugin.getMessage("status.confirm-prompt"));
+                
+                if (confirmationListener != null) {
+                    confirmationListener.addPending(sender, tempFile);
+                } else {
+                    sender.sendMessage(plugin.getMessage("errors.listener-missing"));
+                }
+                
+            } catch (Exception e) {
+                sender.sendMessage(plugin.getMessage("errors.fetch-manifest-failed", Placeholder.unparsed("error", e.getMessage())));
+            }
+            return;
+        }
+
         packageManager.ensureDir();
         sendStatus(sender, plugin.getMessage("status.update-reading"));
         sendStatus(sender, plugin.getMessage("status.update-building"));
@@ -677,9 +730,12 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         String filename = args.isEmpty() ? "apt-manifest.yml" : args.get(0);
         if (!filename.endsWith(".yml")) filename += ".yml";
         File file = new File(plugin.getDataFolder(), filename);
-        
+        performImport(sender, file);
+    }
+
+    public void performImport(CommandSender sender, File file) {
         if (!file.exists()) {
-             sender.sendMessage(plugin.getMessage("errors.manifest-not-found", Placeholder.unparsed("arg", filename)));
+             sender.sendMessage(plugin.getMessage("errors.manifest-not-found", Placeholder.unparsed("arg", file.getName())));
              return;
         }
 
