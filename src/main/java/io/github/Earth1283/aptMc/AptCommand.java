@@ -4,34 +4,25 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 public class AptCommand implements CommandExecutor, TabCompleter {
-    private final JavaPlugin plugin;
+    private final AptMc plugin;
     private final PackageManager packageManager;
 
-    public AptCommand(JavaPlugin plugin) {
+    public AptCommand(AptMc plugin) {
         this.plugin = plugin;
         this.packageManager = new PackageManager(plugin.getDataFolder(), plugin.getDataFolder().getParentFile());
     }
@@ -49,38 +40,20 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
                 switch (subCommand) {
-                    case "info":
-                        handleInfo(sender, subArgs);
-                        break;
-                    case "list":
-                        handleList(sender, subArgs);
-                        break;
-                    case "update":
-                        handleUpdate(sender);
-                        break;
-                    case "search":
-                        handleSearch(sender, subArgs);
-                        break;
-                    case "install":
-                        handleInstall(sender, subArgs);
-                        break;
-                    case "upgrade":
-                        handleUpgrade(sender);
-                        break;
-                    case "remove":
-                        handleRemove(sender, subArgs);
-                        break;
-                    case "export":
-                        handleExport(sender, subArgs);
-                        break;
-                    case "import":
-                        handleImport(sender, subArgs);
-                        break;
+                    case "info": handleInfo(sender, subArgs); break;
+                    case "list": handleList(sender, subArgs); break;
+                    case "update": handleUpdate(sender); break;
+                    case "search": handleSearch(sender, subArgs); break;
+                    case "install": handleInstall(sender, subArgs); break;
+                    case "upgrade": handleUpgrade(sender); break;
+                    case "remove": handleRemove(sender, subArgs); break;
+                    case "export": handleExport(sender, subArgs); break;
+                    case "import": handleImport(sender, subArgs); break;
                     default:
-                        sender.sendMessage(Component.text("Unknown command: " + subCommand + ". Use /apt help for usage.", NamedTextColor.RED));
+                        sender.sendMessage(plugin.getMessage("errors.unknown-command", Placeholder.unparsed("arg", subCommand)));
                 }
             } catch (Exception e) {
-                sender.sendMessage(Component.text("Error executing command: " + e.getMessage(), NamedTextColor.RED));
+                sender.sendMessage(plugin.getMessage("errors.execution-error", Placeholder.unparsed("arg", e.getMessage())));
                 e.printStackTrace();
             }
         });
@@ -90,23 +63,23 @@ public class AptCommand implements CommandExecutor, TabCompleter {
 
     private void sendHelp(CommandSender sender) {
         if (plugin.getConfig().getBoolean("apt-song-references")) {
-             sender.sendMessage(Component.text("\u266A Apateu, apateu! \u266A ... (I am a serious tool, you know)", NamedTextColor.LIGHT_PURPLE));
+             sender.sendMessage(plugin.getMessage("usage.song-ref"));
         }
-        sender.sendMessage(Component.text("apt-mc Usage Guide:", NamedTextColor.GOLD, TextDecoration.BOLD));
-        sender.sendMessage(Component.text("/apt install <pkg1> [pkg2]...", NamedTextColor.YELLOW).append(Component.text(" - Install plugins", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt remove <pkg>", NamedTextColor.YELLOW).append(Component.text(" - Remove a plugin", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt upgrade", NamedTextColor.YELLOW).append(Component.text(" - Upgrade all plugins", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt search <query>", NamedTextColor.YELLOW).append(Component.text(" - Search Modrinth", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt info <pkg>", NamedTextColor.YELLOW).append(Component.text(" - View plugin details", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt list", NamedTextColor.YELLOW).append(Component.text(" - List installed plugins", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt update", NamedTextColor.YELLOW).append(Component.text(" - Update index", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt export [file]", NamedTextColor.YELLOW).append(Component.text(" - Export state", NamedTextColor.WHITE)));
-        sender.sendMessage(Component.text("/apt import [file]", NamedTextColor.YELLOW).append(Component.text(" - Import state", NamedTextColor.WHITE)));
+        sender.sendMessage(plugin.getMessage("usage.header"));
+        sender.sendMessage(plugin.getMessage("usage.install"));
+        sender.sendMessage(plugin.getMessage("usage.remove"));
+        sender.sendMessage(plugin.getMessage("usage.upgrade"));
+        sender.sendMessage(plugin.getMessage("usage.search"));
+        sender.sendMessage(plugin.getMessage("usage.info"));
+        sender.sendMessage(plugin.getMessage("usage.list"));
+        sender.sendMessage(plugin.getMessage("usage.update"));
+        sender.sendMessage(plugin.getMessage("usage.export"));
+        sender.sendMessage(plugin.getMessage("usage.import"));
     }
 
     private void handleInfo(CommandSender sender, List<String> args) {
         if (args.isEmpty()) {
-            sender.sendMessage(Component.text("Usage: /apt info <package>", NamedTextColor.RED));
+            sender.sendMessage(plugin.getMessage("usage.info"));
             return;
         }
         String pkg = args.get(0);
@@ -114,14 +87,13 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         try {
             JsonObject project = ModrinthAPI.getProject(pkg);
             if (project == null) {
-                sender.sendMessage(Component.text("E: Unable to locate package " + pkg, NamedTextColor.RED));
+                sender.sendMessage(plugin.getMessage("errors.package-not-found", Placeholder.unparsed("arg", pkg)));
                 return;
             }
 
-            // Check installation status
             Map<String, String> installedPlugins = packageManager.getInstalledPlugins();
             String status = "Not Installed";
-            NamedTextColor statusColor = NamedTextColor.RED;
+            String statusKey = "status.not-installed";
 
             if (!installedPlugins.isEmpty()) {
                 List<String> hashes = new ArrayList<>(installedPlugins.values());
@@ -129,14 +101,13 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                 
                 for(JsonObject v : installedVersions.values()) {
                     if (v.get("project_id").getAsString().equals(project.get("id").getAsString())) {
-                        status = "Installed";
-                        statusColor = NamedTextColor.GREEN;
+                        statusKey = "status.installed";
                         break;
                     }
                 }
             }
+            Component statusComp = plugin.getMessage(statusKey);
 
-            // Dependencies (simplified)
             String dependencies = "None";
             try {
                 JsonArray versions = ModrinthAPI.getVersions(project.get("id").getAsString(), List.of("spigot", "paper", "purpur", "bukkit"));
@@ -158,15 +129,15 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                 }
             } catch (Exception ignored) {}
 
-            sender.sendMessage(Component.text("Package: ", NamedTextColor.WHITE).append(Component.text(project.get("slug").getAsString()).decoration(TextDecoration.BOLD, false)));
-            sender.sendMessage(Component.text("ID: ", NamedTextColor.WHITE).append(Component.text(project.get("id").getAsString())));
-            sender.sendMessage(Component.text("Status: ", NamedTextColor.WHITE).append(Component.text(status, statusColor)));
-            sender.sendMessage(Component.text("Description: ", NamedTextColor.WHITE).append(Component.text(project.get("description").getAsString())));
-            sender.sendMessage(Component.text("Downloads: ", NamedTextColor.WHITE).append(Component.text(project.get("downloads").getAsInt())));
-            sender.sendMessage(Component.text("Dependencies: ", NamedTextColor.WHITE).append(Component.text(dependencies)));
+            sender.sendMessage(plugin.getMessage("status.package-info.name", Placeholder.unparsed("arg", project.get("slug").getAsString())));
+            sender.sendMessage(plugin.getMessage("status.package-info.id", Placeholder.unparsed("arg", project.get("id").getAsString())));
+            sender.sendMessage(plugin.getMessage("status.package-info.status", Placeholder.component("arg", statusComp)));
+            sender.sendMessage(plugin.getMessage("status.package-info.description", Placeholder.unparsed("arg", project.get("description").getAsString())));
+            sender.sendMessage(plugin.getMessage("status.package-info.downloads", Placeholder.unparsed("arg", String.valueOf(project.get("downloads").getAsInt()))));
+            sender.sendMessage(plugin.getMessage("status.package-info.dependencies", Placeholder.unparsed("arg", dependencies)));
 
         } catch (Exception e) {
-             sender.sendMessage(Component.text("E: Failed to fetch info: " + e.getMessage(), NamedTextColor.RED));
+             sender.sendMessage(plugin.getMessage("errors.error-checking-pkg", Placeholder.unparsed("arg", pkg), Placeholder.unparsed("error", e.getMessage())));
         }
     }
 
@@ -175,17 +146,14 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         Map<String, String> installedPlugins = packageManager.getInstalledPlugins();
 
         if (installedPlugins.isEmpty()) {
-            sender.sendMessage(Component.text("No plugins installed.", NamedTextColor.YELLOW));
+            sender.sendMessage(plugin.getMessage("status.list-empty"));
             return;
         }
 
-        sender.sendMessage(Component.text("Listing... Done", NamedTextColor.GREEN));
+        sender.sendMessage(plugin.getMessage("status.listing"));
 
         try {
             Map<String, JsonObject> versionsMap = resolveVersions(new ArrayList<>(installedPlugins.values()));
-            
-            // Reverse lookup: sha1 -> filename
-            // installedPlugins is filename -> sha1
             
             for (Map.Entry<String, String> entry : installedPlugins.entrySet()) {
                 String filename = entry.getKey();
@@ -196,36 +164,42 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                 
                 if (versionsMap.containsKey(sha1)) {
                     JsonObject v = versionsMap.get(sha1);
-                    pkgName = v.get("project_id").getAsString(); // Modrinth doesn't return slug here easily without N requests
+                    pkgName = v.get("project_id").getAsString();
                     verNum = v.get("version_number").getAsString();
                 }
                 
-                sender.sendMessage(Component.text(pkgName, NamedTextColor.GREEN)
-                        .append(Component.text(" "))
-                        .append(Component.text(verNum, NamedTextColor.WHITE))
-                        .append(Component.text(" [installed]", NamedTextColor.GRAY)));
+                sender.sendMessage(plugin.getMessage("status.list-item", Placeholder.unparsed("arg1", pkgName), Placeholder.unparsed("arg2", verNum)));
             }
         } catch (Exception e) {
-            sender.sendMessage(Component.text("E: Failed to resolve versions: " + e.getMessage(), NamedTextColor.RED));
+            sender.sendMessage(plugin.getMessage("errors.error-checking-pkg", Placeholder.unparsed("arg", "list"), Placeholder.unparsed("error", e.getMessage())));
         }
     }
 
     private void handleUpdate(CommandSender sender) {
-        // Simulation
-        String[] loaders = {"spigot", "paper", "purpur"};
-        int i = 1;
-        for (String loader : loaders) {
-            sendStatus(sender, Component.text("Hit:" + i + " https://api.modrinth.com/v2/search " + loader, NamedTextColor.WHITE));
-            i++;
-            try { Thread.sleep(300); } catch (InterruptedException ignored) {}
-        }
-        sendStatus(sender, Component.text("Reading package lists... Done", NamedTextColor.GREEN));
-        sendStatus(sender, Component.text("Building dependency tree... Done", NamedTextColor.GREEN));
-        sendStatus(sender, Component.text("Reading state information... Done", NamedTextColor.GREEN));
+        sendStatus(sender, plugin.getMessage("status.update-hit", Placeholder.unparsed("arg1", "1"), Placeholder.unparsed("arg2", "https://api.modrinth.com/v2/search stable")));
+        try { Thread.sleep(200); } catch (InterruptedException ignored) {}
+        
+        sendStatus(sender, plugin.getMessage("status.update-get", Placeholder.unparsed("arg1", "2"), Placeholder.unparsed("arg2", "https://api.modrinth.com/v2/search plugins-updates"), Placeholder.unparsed("arg3", "42.0 kB")));
+        try { Thread.sleep(300); } catch (InterruptedException ignored) {}
+        
+        sendStatus(sender, plugin.getMessage("status.update-hit", Placeholder.unparsed("arg1", "3"), Placeholder.unparsed("arg2", "https://api.modrinth.com/v2/search spigot")));
+        try { Thread.sleep(150); } catch (InterruptedException ignored) {}
+        
+        sendStatus(sender, plugin.getMessage("status.update-hit", Placeholder.unparsed("arg1", "4"), Placeholder.unparsed("arg2", "https://api.modrinth.com/v2/search paper")));
+        try { Thread.sleep(150); } catch (InterruptedException ignored) {}
 
-        // Self-update check
+        if (plugin.getConfig().getBoolean("enable-hangar")) {
+            sendStatus(sender, plugin.getMessage("status.update-hit", Placeholder.unparsed("arg1", "5"), Placeholder.unparsed("arg2", "https://hangar.papermc.io/api/v1/projects")));
+            try { Thread.sleep(200); } catch (InterruptedException ignored) {}
+        }
+
+        boolean updateFound = false;
+        JsonObject latestVersionObj = null;
+
         try {
-            sendStatus(sender, Component.text("Checking for self-updates (apt-mc)...", NamedTextColor.WHITE));
+            int hitNum = plugin.getConfig().getBoolean("enable-hangar") ? 6 : 5;
+            sendStatus(sender, plugin.getMessage("status.update-hit", Placeholder.unparsed("arg1", String.valueOf(hitNum)), Placeholder.unparsed("arg2", "https://api.modrinth.com/v2/project/apt-mc stable")));
+            
             JsonObject project = ModrinthAPI.getProject("apt-mc");
             if (project != null) {
                 String projectId = project.get("id").getAsString();
@@ -237,71 +211,134 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                     String currentVer = plugin.getDescription().getVersion();
 
                     if (!latestVer.equalsIgnoreCase(currentVer)) {
-                        sendStatus(sender, Component.text("New version found: " + latestVer + " (Current: " + currentVer + ")", NamedTextColor.GREEN));
-                        
-                        JsonArray files = latest.getAsJsonArray("files");
-                        if (files.size() > 0) {
-                            JsonObject primaryFile = files.get(0).getAsJsonObject();
-                            for(JsonElement f : files) {
-                                if (f.getAsJsonObject().has("primary") && f.getAsJsonObject().get("primary").getAsBoolean()) {
-                                    primaryFile = f.getAsJsonObject();
-                                    break;
-                                }
-                            }
-                            
-                            String url = primaryFile.get("url").getAsString();
-                            String filename = primaryFile.get("filename").getAsString();
-                            long size = primaryFile.get("size").getAsLong();
-                            
-                            sendStatus(sender, Component.text("Downloading update...", NamedTextColor.BLUE));
-                            packageManager.downloadFile(url, packageManager.getUpdateDir(), filename, size, createProgressCallback(sender, filename));
-                            sendStatus(sender, Component.text("Update downloaded. Restart server to apply.", NamedTextColor.GOLD));
-                            return;
-                        }
+                        updateFound = true;
+                        latestVersionObj = latest;
                     }
                 }
             }
         } catch (Exception e) {
-             sender.sendMessage(Component.text("W: Failed to check self-update: " + e.getMessage(), NamedTextColor.YELLOW));
+             sender.sendMessage(plugin.getMessage("errors.self-update-check-failed", Placeholder.unparsed("error", e.getMessage())));
+        }
+        
+        sendStatus(sender, plugin.getMessage("status.update-fetched", Placeholder.unparsed("arg1", "42.0 kB"), Placeholder.unparsed("arg2", "51.2 kB")));
+        
+        sendStatus(sender, plugin.getMessage("status.update-reading"));
+        sendStatus(sender, plugin.getMessage("status.update-building"));
+        sendStatus(sender, plugin.getMessage("status.update-state"));
+
+        if (updateFound && latestVersionObj != null) {
+            String latestVer = latestVersionObj.get("version_number").getAsString();
+            String currentVer = plugin.getDescription().getVersion();
+            // Using placeholder for self update message
+            sendStatus(sender, plugin.getMessage("status.self-update-found", Placeholder.unparsed("arg1", latestVer), Placeholder.unparsed("arg2", currentVer)));
+            
+            JsonArray files = latestVersionObj.getAsJsonArray("files");
+            if (files.size() > 0) {
+                JsonObject primaryFile = files.get(0).getAsJsonObject();
+                for(JsonElement f : files) {
+                    if (f.getAsJsonObject().has("primary") && f.getAsJsonObject().get("primary").getAsBoolean()) {
+                        primaryFile = f.getAsJsonObject();
+                        break;
+                    }
+                }
+                
+                try {
+                    String url = primaryFile.get("url").getAsString();
+                    String filename = primaryFile.get("filename").getAsString();
+                    long size = primaryFile.get("size").getAsLong();
+                    
+                    sendStatus(sender, plugin.getMessage("status.self-update-downloading"));
+                    packageManager.downloadFile(url, packageManager.getUpdateDir(), filename, size, createProgressCallback(sender, filename));
+                    sendStatus(sender, plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", "Update")));
+                    return;
+                } catch (Exception e) {
+                    sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", "apt-mc"), Placeholder.unparsed("error", e.getMessage())));
+                }
+            }
         }
 
-        sender.sendMessage(Component.text("All packages are up to date.", NamedTextColor.WHITE));
+        sender.sendMessage(plugin.getMessage("status.up-to-date"));
     }
 
     private void handleSearch(CommandSender sender, List<String> args) {
         if (args.isEmpty()) {
-            sender.sendMessage(Component.text("Usage: /apt search <query>", NamedTextColor.RED));
+            sender.sendMessage(plugin.getMessage("usage.search"));
             return;
         }
         String query = String.join(" ", args);
-        sendStatus(sender, Component.text("Sorting... Done", NamedTextColor.GREEN));
-        sendStatus(sender, Component.text("Full Text Search... Done", NamedTextColor.GREEN));
+        
+        sendStatus(sender, plugin.getMessage("status.search-sorting"));
+        sendStatus(sender, plugin.getMessage("status.search-text"));
+
+        List<String> priority = plugin.getConfig().getStringList("source-priority");
+        if (priority.isEmpty()) priority = List.of("modrinth", "hangar");
+
+        List<JsonObject> modrinthHits = new ArrayList<>();
+        List<JsonObject> hangarHits = new ArrayList<>();
 
         try {
-            JsonArray hits = ModrinthAPI.search(query, 10);
-            if (hits.size() == 0) {
-                sender.sendMessage(Component.text("No plugins found for '" + query + "'.", NamedTextColor.YELLOW));
+            for (String source : priority) {
+                if (source.equalsIgnoreCase("modrinth")) {
+                    JsonArray hits = ModrinthAPI.search(query, 10);
+                    for(JsonElement h : hits) modrinthHits.add(h.getAsJsonObject());
+                } else if (source.equalsIgnoreCase("hangar") && plugin.getConfig().getBoolean("enable-hangar")) {
+                    try {
+                        JsonObject hRes = HangarAPI.search(query, 5, 0);
+                        if (hRes.has("result")) {
+                            JsonArray res = hRes.getAsJsonArray("result");
+                            for (JsonElement e : res) {
+                                JsonObject obj = e.getAsJsonObject();
+                                obj.addProperty("source", "hangar");
+                                hangarHits.add(obj);
+                            }
+                        }
+                    } catch (Exception e) {
+                        sender.sendMessage(plugin.getMessage("errors.hangar-search-failed", Placeholder.unparsed("error", e.getMessage())));
+                    }
+                }
+            }
+            
+            if (modrinthHits.isEmpty() && hangarHits.isEmpty()) {
+                sender.sendMessage(plugin.getMessage("status.search-empty", Placeholder.unparsed("arg", query)));
                 return;
             }
             
-            // Header
-            sender.sendMessage(Component.text("Package Name - Description - Author - Downloads", NamedTextColor.LIGHT_PURPLE));
+            sender.sendMessage(plugin.getMessage("status.search-header"));
 
-            for (JsonElement hit : hits) {
-                JsonObject h = hit.getAsJsonObject();
-                String slug = h.get("slug").getAsString();
-                String desc = h.get("description").getAsString();
-                if (desc.length() > 50) desc = desc.substring(0, 50) + "...";
-                String author = h.get("author").getAsString();
-                int downloads = h.get("downloads").getAsInt();
-
-                sender.sendMessage(Component.text(slug, NamedTextColor.GREEN)
-                        .append(Component.text(" - " + desc, NamedTextColor.WHITE))
-                        .append(Component.text(" - " + author, NamedTextColor.AQUA))
-                        .append(Component.text(" - " + downloads, NamedTextColor.GRAY)));
+            // Display in priority order
+            for (String source : priority) {
+                if (source.equalsIgnoreCase("modrinth")) {
+                    for (JsonObject h : modrinthHits) {
+                        String slug = h.get("slug").getAsString();
+                        String desc = h.get("description").getAsString();
+                        if (desc.length() > 50) desc = desc.substring(0, 50) + "...";
+                        String author = h.get("author").getAsString();
+                        int downloads = h.get("downloads").getAsInt();
+                        
+                        sender.sendMessage(plugin.getMessage("status.search-result-modrinth",
+                                Placeholder.unparsed("slug", slug),
+                                Placeholder.unparsed("desc", desc),
+                                Placeholder.unparsed("author", author),
+                                Placeholder.unparsed("downloads", String.valueOf(downloads))));
+                    }
+                } else if (source.equalsIgnoreCase("hangar")) {
+                    for (JsonObject h : hangarHits) {
+                        String slug = h.get("name").getAsString();
+                        String desc = h.has("description") && !h.get("description").isJsonNull() ? h.get("description").getAsString() : "No description";
+                        if (desc.length() > 50) desc = desc.substring(0, 50) + "...";
+                        String author = h.getAsJsonObject("namespace").get("owner").getAsString();
+                        int downloads = h.getAsJsonObject("stats").get("downloads").getAsInt();
+                        
+                        sender.sendMessage(plugin.getMessage("status.search-result-hangar",
+                                Placeholder.unparsed("slug", slug),
+                                Placeholder.unparsed("desc", desc),
+                                Placeholder.unparsed("author", author),
+                                Placeholder.unparsed("downloads", String.valueOf(downloads))));
+                    }
+                }
             }
         } catch (Exception e) {
-             sender.sendMessage(Component.text("E: Failed to search: " + e.getMessage(), NamedTextColor.RED));
+             sender.sendMessage(plugin.getMessage("errors.search-failed", Placeholder.unparsed("error", e.getMessage())));
         }
     }
 
@@ -335,7 +372,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                             if (depObj.has("project_id") && !depObj.get("project_id").isJsonNull()) {
                                 String depId = depObj.get("project_id").getAsString();
                                 if (!installedIds.contains(depId) && !toInstall.containsKey(depId)) {
-                                    sendStatus(sender, Component.text("Resolving dependency: " + depId, NamedTextColor.GRAY));
+                                    sendStatus(sender, plugin.getMessage("status.checking", Placeholder.unparsed("arg", "dependency: " + depId)));
                                     JsonObject depProj = ModrinthAPI.getProject(depId);
                                     if (depProj != null) {
                                         resolveDependenciesRecursive(sender, depProj, toInstall, installedIds);
@@ -347,60 +384,105 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                 }
             }
         } catch (Exception e) {
-            sender.sendMessage(Component.text("W: Failed to resolve dependencies for " + slug + ": " + e.getMessage(), NamedTextColor.YELLOW));
+            sender.sendMessage(plugin.getMessage("errors.failed-resolve-deps", Placeholder.unparsed("arg", slug), Placeholder.unparsed("error", e.getMessage())));
         }
     }
 
     private void handleInstall(CommandSender sender, List<String> args) {
         if (args.isEmpty()) {
-            sender.sendMessage(Component.text("E: No packages specified.", NamedTextColor.RED));
+            sender.sendMessage(plugin.getMessage("errors.no-packages-specified"));
             return;
         }
 
         packageManager.ensureDir();
-        sendStatus(sender, Component.text("Reading package lists... Done", NamedTextColor.GREEN));
-        sendStatus(sender, Component.text("Building dependency tree... Done", NamedTextColor.GREEN));
+        sendStatus(sender, plugin.getMessage("status.update-reading"));
+        sendStatus(sender, plugin.getMessage("status.update-building"));
 
         Set<String> installedIds = getInstalledProjectIds();
         Map<String, JsonObject> toInstallMap = new HashMap<>();
+        List<String> priority = plugin.getConfig().getStringList("source-priority");
+        if (priority.isEmpty()) priority = List.of("modrinth", "hangar");
 
         for (String pkgSlug : args) {
+            boolean found = false;
             try {
-                sendStatus(sender, Component.text("Check " + pkgSlug + "...", NamedTextColor.WHITE));
-                JsonObject project = ModrinthAPI.getProject(pkgSlug);
-                if (project != null) {
-                    resolveDependenciesRecursive(sender, project, toInstallMap, installedIds);
-                } else {
-                    sender.sendMessage(Component.text("E: Unable to locate package " + pkgSlug, NamedTextColor.RED));
+                for (String source : priority) {
+                    if (source.equalsIgnoreCase("modrinth")) {
+                        sendStatus(sender, plugin.getMessage("status.checking", Placeholder.unparsed("arg", pkgSlug + " on Modrinth")));
+                        JsonObject project = ModrinthAPI.getProject(pkgSlug);
+                        if (project != null) {
+                            resolveDependenciesRecursive(sender, project, toInstallMap, installedIds);
+                            found = true;
+                            break;
+                        }
+                    } else if (source.equalsIgnoreCase("hangar") && plugin.getConfig().getBoolean("enable-hangar")) {
+                        sendStatus(sender, plugin.getMessage("status.checking", Placeholder.unparsed("arg", pkgSlug + " on Hangar")));
+                        JsonObject hangarProject = HangarAPI.getProject(pkgSlug);
+                        if (hangarProject != null) {
+                            JsonObject versionInfo = HangarAPI.getLatestVersion(pkgSlug, "PAPER");
+                            if (versionInfo != null) {
+                                versionInfo.addProperty("source", "hangar");
+                                versionInfo.addProperty("hangar_slug", hangarProject.get("name").getAsString());
+                                toInstallMap.put(hangarProject.get("name").getAsString(), versionInfo);
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (!found) {
+                    sender.sendMessage(plugin.getMessage("errors.package-not-found", Placeholder.unparsed("arg", pkgSlug)));
                 }
             } catch (Exception e) {
-                sender.sendMessage(Component.text("E: Error checking " + pkgSlug + ": " + e.getMessage(), NamedTextColor.RED));
+                sender.sendMessage(plugin.getMessage("errors.error-checking-pkg", Placeholder.unparsed("arg", pkgSlug), Placeholder.unparsed("error", e.getMessage())));
             }
         }
 
         List<JsonObject> toInstall = new ArrayList<>(toInstallMap.values());
         if (toInstall.isEmpty()) {
-            sender.sendMessage(Component.text("All packages already installed or not found.", NamedTextColor.YELLOW));
+            sender.sendMessage(plugin.getMessage("status.up-to-date")); // Generic "nothing to do"
             return;
         }
 
         if (plugin.getConfig().getBoolean("apt-song-references")) {
-            sender.sendMessage(Component.text(getRandomAptQuote(), NamedTextColor.LIGHT_PURPLE));
+            // sender.sendMessage(Component.text(getRandomAptQuote(), net.kyori.adventure.text.format.NamedTextColor.LIGHT_PURPLE)); 
+            sender.sendMessage(plugin.getMessage("status.install-song-ref")); 
         }
 
-        sender.sendMessage(Component.text("\nThe following NEW packages will be installed:", NamedTextColor.WHITE));
+        sender.sendMessage(plugin.getMessage("status.install-header"));
         for (JsonObject pkg : toInstall) {
-            sender.sendMessage(Component.text("  " + pkg.get("slug").getAsString(), NamedTextColor.GREEN));
+            String name = pkg.has("slug") ? pkg.get("slug").getAsString() : (pkg.has("hangar_slug") ? pkg.get("hangar_slug").getAsString() : "unknown");
+            sender.sendMessage(plugin.getMessage("status.install-item", Placeholder.unparsed("arg", name)));
         }
-        sender.sendMessage(Component.text("\n0 upgraded, " + toInstall.size() + " newly installed, 0 to remove and 0 not upgraded.", NamedTextColor.WHITE));
+        sender.sendMessage(plugin.getMessage("status.install-summary", Placeholder.unparsed("arg", String.valueOf(toInstall.size()))));
 
         List<CompletableFuture<Void>> installFutures = toInstall.stream()
                 .map(pkg -> CompletableFuture.runAsync(() -> {
+                    if (pkg.has("source") && pkg.get("source").getAsString().equals("hangar")) {
+                        try {
+                            String url = HangarAPI.getDownloadUrl(pkg, "PAPER");
+                            String filename = HangarAPI.getFileName(pkg, "PAPER");
+                            
+                            if (url == null || filename == null) {
+                                 sender.sendMessage(plugin.getMessage("errors.hangar-resolve-failed", Placeholder.unparsed("arg", pkg.get("hangar_slug").getAsString())));
+                                 return;
+                            }
+                            
+                            sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", filename)));
+                            packageManager.downloadFile(url, packageManager.getPluginsDir(), filename, -1, createProgressCallback(sender, filename));
+                            sendStatus(sender, plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", filename)));
+                        } catch (Exception e) {
+                             sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", "Hangar Package"), Placeholder.unparsed("error", e.getMessage())));
+                        }
+                        return;
+                    }
+
                     String slug = pkg.get("slug").getAsString();
                     try {
                         JsonArray versions = ModrinthAPI.getVersions(pkg.get("id").getAsString(), List.of("spigot", "paper", "purpur", "bukkit"));
                         if (versions.size() == 0) {
-                            sender.sendMessage(Component.text("E: No compatible versions for " + slug, NamedTextColor.RED));
+                            sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", slug), Placeholder.unparsed("error", "No compatible versions")));
                             return;
                         }
                         
@@ -419,42 +501,34 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                         String filename = primaryFile.get("filename").getAsString();
                         long size = primaryFile.get("size").getAsLong();
                         
-                        sendStatus(sender, Component.text("Downloading " + filename + "...", NamedTextColor.BLUE));
+                        sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", filename)));
                         packageManager.downloadFile(url, packageManager.getPluginsDir(), filename, size, createProgressCallback(sender, filename));
-                        sendStatus(sender, Component.text("Downloaded " + filename, NamedTextColor.GREEN));
+                        sendStatus(sender, plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", filename)));
                         
                     } catch (Exception e) {
-                        sender.sendMessage(Component.text("E: Failed to install " + slug + ": " + e.getMessage(), NamedTextColor.RED));
+                        sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", slug), Placeholder.unparsed("error", e.getMessage())));
                     }
                 }))
                 .collect(Collectors.toList());
 
         CompletableFuture.allOf(installFutures.toArray(new CompletableFuture[0])).join();
-        sender.sendMessage(Component.text("Installation complete. Restart server to apply changes.", NamedTextColor.GOLD));
+        sender.sendMessage(plugin.getMessage("status.install-complete"));
     }
 
     private String getRandomAptQuote() {
-        List<String> quotes = Arrays.asList(
-            "Apateu makes you wake up on the ground. apt-mc makes you wake up to a complete server.",
-            "Kissy face, kissy face... sent to your console log.",
-            "Sleep tomorrow, but I install tonight.",
-            "Turn this apateu into a server.",
-            "Don't you want me like I want you... to handle your dependencies?",
-            "Apateu, apateu! ...fine, installing your stuff."
-        );
-        return quotes.get(new java.util.Random().nextInt(quotes.size()));
+        return "";
     }
 
     private void handleUpgrade(CommandSender sender) {
-        sendStatus(sender, Component.text("Reading package lists... Done", NamedTextColor.GREEN));
-        sendStatus(sender, Component.text("Building dependency tree... Done", NamedTextColor.GREEN));
-        sendStatus(sender, Component.text("Reading state information... Done", NamedTextColor.GREEN));
-        sendStatus(sender, Component.text("Calculating upgrades... ", NamedTextColor.WHITE));
+        sendStatus(sender, plugin.getMessage("status.update-reading"));
+        sendStatus(sender, plugin.getMessage("status.update-building"));
+        sendStatus(sender, plugin.getMessage("status.update-state"));
+        sendStatus(sender, plugin.getMessage("status.calculating-upgrades"));
 
         Map<String, String> installed = packageManager.getInstalledPlugins();
         if (installed.isEmpty()) {
-            sender.sendMessage(Component.text("Done", NamedTextColor.GREEN));
-            sender.sendMessage(Component.text("0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.", NamedTextColor.WHITE));
+            sender.sendMessage(plugin.getMessage("status.done"));
+            sender.sendMessage(plugin.getMessage("status.upgrade-summary-empty"));
             return;
         }
 
@@ -489,20 +563,20 @@ public class AptCommand implements CommandExecutor, TabCompleter {
             
             CompletableFuture.allOf(checkFutures.toArray(new CompletableFuture[0])).join();
             
-            sender.sendMessage(Component.text("Done", NamedTextColor.GREEN));
+            sender.sendMessage(plugin.getMessage("status.done"));
             
             if (updates.isEmpty()) {
-                sender.sendMessage(Component.text("0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.", NamedTextColor.WHITE));
+                sender.sendMessage(plugin.getMessage("status.upgrade-summary-empty"));
                 return;
             }
 
-            sender.sendMessage(Component.text("\nThe following packages will be upgraded:", NamedTextColor.WHITE));
+            sender.sendMessage(plugin.getMessage("status.upgrade-list-header"));
             for (UpgradeInfo up : updates) {
-                sender.sendMessage(Component.text("  " + up.filename + " (" + up.currentVersion + " -> " + up.newVersion + ")", NamedTextColor.WHITE));
+                sender.sendMessage(plugin.getMessage("status.upgrade-list-item", Placeholder.unparsed("arg1", up.filename), Placeholder.unparsed("arg2", up.currentVersion), Placeholder.unparsed("arg3", up.newVersion)));
             }
             
-            sender.sendMessage(Component.text("\n" + updates.size() + " upgraded, 0 newly installed, 0 to remove and 0 not upgraded.", NamedTextColor.WHITE));
-            sender.sendMessage(Component.text("Upgrading...", NamedTextColor.BLUE));
+            sender.sendMessage(plugin.getMessage("status.upgrade-summary", Placeholder.unparsed("arg", String.valueOf(updates.size()))));
+            sender.sendMessage(plugin.getMessage("status.upgrading"));
             
             List<CompletableFuture<Void>> upgradeFutures = updates.stream()
                 .map(up -> CompletableFuture.runAsync(() -> {
@@ -520,18 +594,18 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                     // Download new to update folder
                     try {
                         packageManager.downloadFile(primaryFile.get("url").getAsString(), packageManager.getUpdateDir(), primaryFile.get("filename").getAsString(), primaryFile.get("size").getAsLong(), createProgressCallback(sender, up.filename));
-                         sendStatus(sender, Component.text("Upgraded " + up.filename, NamedTextColor.GREEN));
+                         sendStatus(sender, plugin.getMessage("status.upgraded", Placeholder.unparsed("arg", up.filename)));
                     } catch (Exception e) {
-                        sender.sendMessage(Component.text("E: Failed to upgrade " + up.filename + ": " + e.getMessage(), NamedTextColor.RED));
+                        sender.sendMessage(plugin.getMessage("errors.upgrade-failed", Placeholder.unparsed("arg", up.filename), Placeholder.unparsed("error", e.getMessage())));
                     }
                 }))
                 .collect(Collectors.toList());
 
              CompletableFuture.allOf(upgradeFutures.toArray(new CompletableFuture[0])).join();
-             sender.sendMessage(Component.text("Upgrade complete. Restart server to apply changes.", NamedTextColor.GOLD));
+             sender.sendMessage(plugin.getMessage("status.upgrade-complete"));
 
         } catch (Exception e) {
-             sender.sendMessage(Component.text("E: Failed to check for updates: " + e.getMessage(), NamedTextColor.RED));
+             sender.sendMessage(plugin.getMessage("errors.error-checking-pkg", Placeholder.unparsed("arg", "upgrades"), Placeholder.unparsed("error", e.getMessage())));
         }
     }
     
@@ -556,11 +630,11 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         if (!filename.endsWith(".yml")) filename += ".yml";
         File file = new File(plugin.getDataFolder(), filename);
         
-        sendStatus(sender, Component.text("Exporting state to " + filename + "...", NamedTextColor.YELLOW));
+        sendStatus(sender, plugin.getMessage("status.exporting", Placeholder.unparsed("arg", filename)));
         
         Map<String, String> installed = packageManager.getInstalledPlugins();
         if (installed.isEmpty()) {
-             sender.sendMessage(Component.text("No plugins installed to export.", NamedTextColor.RED));
+             sender.sendMessage(plugin.getMessage("status.export-empty"));
              return;
         }
 
@@ -571,6 +645,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         yaml.set("project-details.title", "Server Export");
         yaml.set("project-details.author", sender.getName());
         
+        List<Map<String, String>> pluginList = new ArrayList<>();
         int count = 0;
         for (Map.Entry<String, String> entry : installed.entrySet()) {
             String pluginFilename = entry.getKey();
@@ -580,18 +655,21 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                 JsonObject v = versions.get(sha1);
                 String projectId = v.get("project_id").getAsString();
                 String verNum = v.get("version_number").getAsString();
-                String name = pluginFilename.endsWith(".jar") ? pluginFilename.substring(0, pluginFilename.length() - 4) : pluginFilename;
                 
-                yaml.set("plugins." + name, "modrinth:" + projectId + "/" + verNum);
+                Map<String, String> entryMap = new LinkedHashMap<>();
+                entryMap.put("file", pluginFilename);
+                entryMap.put("source", "modrinth:" + projectId + "/" + verNum);
+                pluginList.add(entryMap);
                 count++;
             }
         }
+        yaml.set("plugins", pluginList);
         
         try {
             yaml.save(file);
-             sender.sendMessage(Component.text("Exported " + count + " plugins to " + file.getPath(), NamedTextColor.GREEN));
+             sender.sendMessage(plugin.getMessage("status.export-success", Placeholder.unparsed("arg1", String.valueOf(count)), Placeholder.unparsed("arg2", file.getPath())));
         } catch (IOException e) {
-             sender.sendMessage(Component.text("E: Failed to save manifest: " + e.getMessage(), NamedTextColor.RED));
+             sender.sendMessage(plugin.getMessage("status.export-failed", Placeholder.unparsed("error", e.getMessage())));
         }
     }
 
@@ -601,33 +679,31 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         File file = new File(plugin.getDataFolder(), filename);
         
         if (!file.exists()) {
-             sender.sendMessage(Component.text("E: Manifest file not found: " + filename, NamedTextColor.RED));
+             sender.sendMessage(plugin.getMessage("errors.manifest-not-found", Placeholder.unparsed("arg", filename)));
              return;
         }
 
         FileConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         if (!yaml.contains("plugins")) {
-             sender.sendMessage(Component.text("E: Invalid manifest format (no 'plugins' section).", NamedTextColor.RED));
+             sender.sendMessage(plugin.getMessage("errors.invalid-manifest"));
              return;
         }
         
-        sender.sendMessage(Component.text("Reading manifest...", NamedTextColor.WHITE));
+        sender.sendMessage(plugin.getMessage("status.reading-manifest"));
         
         if (yaml.contains("project-details")) {
             String title = yaml.getString("project-details.title", "Unknown Project");
             String author = yaml.getString("project-details.author", "Unknown Author");
-            sender.sendMessage(Component.text("Importing project: ", NamedTextColor.WHITE)
-                    .append(Component.text(title, NamedTextColor.GREEN))
-                    .append(Component.text(" by ", NamedTextColor.WHITE))
-                    .append(Component.text(author, NamedTextColor.YELLOW)));
+            sender.sendMessage(plugin.getMessage("status.import-header", Placeholder.unparsed("title", title), Placeholder.unparsed("author", author)));
         }
         
         List<CompletableFuture<Void>> futures = new ArrayList<>();
-        // Use an array to count updates inside lambda
         final int[] installedCount = {0};
+        java.util.concurrent.ExecutorService downloadExecutor = java.util.concurrent.Executors.newFixedThreadPool(3);
         
-        for (String key : yaml.getConfigurationSection("plugins").getKeys(false)) {
-            String val = yaml.getString("plugins." + key);
+        List<Map<?, ?>> pluginList = yaml.getMapList("plugins");
+        for (Map<?, ?> entry : pluginList) {
+            String val = (String) entry.get("source");
             if (val == null || !val.startsWith("modrinth:")) continue;
             
             String[] parts = val.substring(9).split("/");
@@ -654,7 +730,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                     }
                     
                     if (targetVer == null) {
-                         sender.sendMessage(Component.text("W: Version " + versionNum + " not found for " + projectId, NamedTextColor.YELLOW));
+                         sender.sendMessage(plugin.getMessage("errors.package-not-found", Placeholder.unparsed("arg", "version " + versionNum + " of " + projectId)));
                          return;
                     }
                     
@@ -675,34 +751,36 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                     
                     File targetFile = new File(packageManager.getPluginsDir(), fileName);
                     if (!targetFile.exists()) {
-                         sendStatus(sender, Component.text("Downloading " + fileName + "...", NamedTextColor.BLUE));
+                         sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", fileName)));
                          packageManager.downloadFile(url, packageManager.getPluginsDir(), fileName, size, createProgressCallback(sender, fileName));
-                         sendStatus(sender, Component.text("Installed " + fileName, NamedTextColor.GREEN));
+                         sendStatus(sender, plugin.getMessage("status.installed-success", Placeholder.unparsed("arg", fileName)));
                          synchronized(installedCount) { installedCount[0]++; }
                     }
                 } catch (Exception e) {
-                    sender.sendMessage(Component.text("E: Failed to install " + key + ": " + e.getMessage(), NamedTextColor.RED));
+                    sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", projectId), Placeholder.unparsed("error", e.getMessage())));
                 }
-            }));
+            }, downloadExecutor));
         }
         
         if (futures.isEmpty()) {
-            sender.sendMessage(Component.text("All plugins from manifest are already installed.", NamedTextColor.GREEN));
+            sender.sendMessage(plugin.getMessage("status.import-empty"));
+            downloadExecutor.shutdown();
         } else {
-            sender.sendMessage(Component.text("Installing " + installedCount[0] + " plugins...", NamedTextColor.WHITE));
+            sender.sendMessage(plugin.getMessage("status.importing-count", Placeholder.unparsed("arg", String.valueOf(futures.size()))));
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-            sender.sendMessage(Component.text("Import complete. Restart server to apply changes.", NamedTextColor.GOLD));
+            downloadExecutor.shutdown();
+            sender.sendMessage(plugin.getMessage("status.import-complete"));
         }
     }
 
     private void handleRemove(CommandSender sender, List<String> args) {
         if (args.isEmpty()) {
-             sender.sendMessage(Component.text("Usage: /apt remove <package>", NamedTextColor.RED));
+             sender.sendMessage(plugin.getMessage("usage.remove"));
             return;
         }
         String pkg = args.get(0);
-        sender.sendMessage(Component.text("Reading package lists... Done", NamedTextColor.GREEN));
-        sender.sendMessage(Component.text("Building dependency tree... Done", NamedTextColor.GREEN));
+        sender.sendMessage(plugin.getMessage("status.update-reading"));
+        sender.sendMessage(plugin.getMessage("status.update-building"));
 
         File[] files = packageManager.getPluginsDir().listFiles();
         List<File> candidates = new ArrayList<>();
@@ -715,21 +793,21 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         }
         
         if (candidates.isEmpty()) {
-            sender.sendMessage(Component.text("E: Unable to locate package " + pkg, NamedTextColor.RED));
+            sender.sendMessage(plugin.getMessage("errors.package-not-found", Placeholder.unparsed("arg", pkg)));
             return;
         }
         
         if (candidates.size() > 1) {
-            sender.sendMessage(Component.text("E: Multiple candidates found for " + pkg + ". Be more specific.", NamedTextColor.RED));
+            sender.sendMessage(plugin.getMessage("errors.execution-error", Placeholder.unparsed("arg", "Multiple candidates found for " + pkg)));
             return;
         }
         
         File target = candidates.get(0);
         if (target.delete()) {
-            sender.sendMessage(Component.text("Removing " + pkg + " (" + target.getName() + ")...", NamedTextColor.GREEN));
-            sender.sendMessage(Component.text("Removal complete. Restart server to apply changes.", NamedTextColor.GOLD));
+            sender.sendMessage(plugin.getMessage("status.removing", Placeholder.unparsed("arg", pkg + " (" + target.getName() + ")")));
+            sender.sendMessage(plugin.getMessage("status.removal-complete"));
         } else {
-            sender.sendMessage(Component.text("E: Failed to remove " + target.getName(), NamedTextColor.RED));
+            sender.sendMessage(plugin.getMessage("errors.remove-failed", Placeholder.unparsed("arg", target.getName())));
         }
     }
 
@@ -764,14 +842,14 @@ public class AptCommand implements CommandExecutor, TabCompleter {
                         else bar.append("-");
                     }
                     bar.append("] ").append(percent).append("%");
-                    sender.sendActionBar(Component.text("Downloading " + filename + " " + bar.toString(), NamedTextColor.BLUE));
+                    sender.sendActionBar(plugin.getMessage("status.downloading", Placeholder.unparsed("arg", filename + " " + bar.toString())));
                 }
             } else {
                 long now = System.currentTimeMillis();
                 if (progress >= 1.0 || now - lastUpdate[0] >= intervalMs) {
                     lastUpdate[0] = now;
                     int percent = (int)(progress * 100);
-                    sender.sendMessage(Component.text("Downloading " + filename + "... " + percent + "%", NamedTextColor.BLUE));
+                    sender.sendMessage(plugin.getMessage("status.downloading", Placeholder.unparsed("arg", filename + "... " + percent + "%")));
                 }
             }
         };

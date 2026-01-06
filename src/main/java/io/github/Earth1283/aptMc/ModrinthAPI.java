@@ -17,7 +17,7 @@ import java.util.Map;
 
 public class ModrinthAPI {
     private static final String BASE_URL = "https://api.modrinth.com/v2";
-    private static final String USER_AGENT = "apt-mc/1.0 (parody-cli)";
+    private static final String USER_AGENT = "apt-mc/1.2 (parody-cli)";
     private static final HttpClient client = HttpClient.newHttpClient();
     private static final Gson gson = new Gson();
 

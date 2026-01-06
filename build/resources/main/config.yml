@@ -7,3 +7,12 @@ console-progress-interval: 5
 
 # Enable references to the song "APT." by Rosé & Bruno Mars
 apt-song-references: true
+
+# Enable scanning the PaperMC Hangar API for plugins (default: false)
+enable-hangar: false
+
+# Priority order for search results and installations.
+# Options: modrinth, hangar
+source-priority:
+  - modrinth
+  - hangar

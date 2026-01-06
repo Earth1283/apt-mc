@@ -32,7 +32,7 @@ public class PackageManager {
     private final File pluginsDir;
     private final File cacheFile;
     private Map<String, JsonObject> cache;
-    private static final String USER_AGENT = "apt-mc/1.0 (parody-cli)";
+    private static final String USER_AGENT = "apt-mc/1.2 (parody-cli)";
     private static final HttpClient client = HttpClient.newHttpClient();
     private static final Gson gson = new Gson();
 

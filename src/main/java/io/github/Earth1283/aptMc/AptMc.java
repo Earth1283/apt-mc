@@ -1,5 +1,8 @@
 package io.github.Earth1283.aptMc;
 
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -25,6 +28,14 @@ public final class AptMc extends JavaPlugin {
     @Override
     public void onDisable() {
         // Plugin shutdown logic
+    }
+
+    public Component getMessage(String key, TagResolver... placeholders) {
+        File messagesFile = new File(getDataFolder(), "messages.yml");
+        FileConfiguration messages = YamlConfiguration.loadConfiguration(messagesFile);
+        String raw = messages.getString(key);
+        if (raw == null) return Component.text("Missing message: " + key);
+        return MiniMessage.miniMessage().deserialize(raw, placeholders);
     }
 
     private void updateConfig(String fileName) {

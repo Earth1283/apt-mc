@@ -1,0 +1,102 @@
+project-details:
+  title: Server Export
+  author: CONSOLE
+plugins:
+  FastAsyncWorldEdit-Paper-2:
+    '14':
+      '3': modrinth:z4HZZnLr/2.14.3
+  LPC-Minimessage: modrinth:LOlAU5yB/3.7.0
+  UltimateAutoRestart 2025:
+    '12': modrinth:nMwMeNFr/2025.12
+  AxPlayerWarps-1:
+    '12':
+      '1': modrinth:QDJHDKvi/1.12.1
+  InventoryRollbackPlus-1:
+    '7':
+      '9': modrinth:XWKWAzd8/1.7.9
+  grimac-bukkit-2:
+    '3':
+      73-daa3bfe: modrinth:yeJMtJfW/2.3.73-daa3bfe-b96
+  HuskHomes-Paper-4:
+    '9':
+      10-bb32609: modrinth:J6U9o3JG/4.9.10-bb32609
+  Typewriter-0:
+    '9':
+      0-beta-170: modrinth:Vm7B3ymm/0.9.0-beta-170
+  ViaVersion-5:
+    '7':
+      '0': modrinth:P1OZGk5p/5.7.0
+  ServerLinksZ-1:
+    '4':
+      '0': modrinth:iR9qgF1M/1.4.0
+  SkinsRestorer: modrinth:TsLS8Py5/15.9.2
+  worldguard-bukkit-7:
+    '0':
+      15-beta-01: modrinth:DKY9btbd/7.0.15-beta-01
+  BetterTeamGUI-2:
+    '3': modrinth:5DvAaNnp/2.3
+  TAB v5:
+    '4':
+      '0': modrinth:gG7VFbG0/5.4.0
+  veinminer-paper-2:
+    '5':
+      '3': modrinth:OhduvhIc/2.5.3
+  AdvancedServerList-Paper-5:
+    '7':
+      '2': modrinth:xss83sOY/5.7.2
+  DecentHolograms-2:
+    '9':
+      '9': modrinth:w02MKsTg/2.9.9
+  Adrenaline-1:
+    '1':
+      '0': modrinth:9MiAUZX4/1.1.0
+  ViaBackwards-5:
+    '7':
+      1-SNAPSHOT: modrinth:NpvuJQoq/5.7.1-SNAPSHOT+533
+  DiscordSRV-Build-1:
+    '30':
+      '3': modrinth:UmLGoGij/1.30.3
+  InteractiveChatDiscordSrvAddon-4:
+    '3':
+      '5':
+        '0': modrinth:LOvZJShs/4.3.5
+  lifestealz-2:
+    '20':
+      '6': modrinth:l8Uv7FzS/2.20.6
+  InteractiveChat-4:
+    '3':
+      '5':
+        '0': modrinth:VOenPQ01/4.3.5
+  LuckPerms-Bukkit-5:
+    '5':
+      '17': modrinth:Vebnzrzj/v5.5.17-bukkit
+  AuthMe-5:
+    '7':
+      0-FORK-Universal: modrinth:3IEZ9vol/5.7.0-FORK-b53
+  Plan-5:
+    6-build-2965: modrinth:wJQfHhxh/5.6+build.2965
+  instantrestock_2:
+    '6':
+      '1': modrinth:7pdfxYHV/2.6.1
+  ClickVillagers-paper-1:
+    '6': modrinth:BITzwT7B/paper-1.6
+  PlaceholderAPI-2:
+    '11':
+      '7': modrinth:lKEzGugV/2.11.7
+  Sonar-Bukkit: modrinth:I2qO6xbc/2.1.43
+  PvPManager: modrinth:1Ffl2uIq/4.0.7
+  OneMace-1:
+    '05': modrinth:OQrFoWOz/1.05
+  FancyHolograms-3:
+    '0':
+      0-SNAPSHOT:
+        '24': modrinth:5QNgOj66/3.0.0-SNAPSHOT.24
+  DeluxeMenus-1:
+    '14':
+      1-Release: modrinth:kKZkPgJ7/1.14.1-Release
+  packetevents-spigot-2:
+    '11':
+      '1': modrinth:HYKaKraK/2.11.1+spigot
+  voicechat-bukkit-2:
+    '6':
+      '7': modrinth:9eGKb6K1/bukkit-2.6.7
