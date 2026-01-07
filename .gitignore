@@ -24,4 +24,8 @@ hs_err_pid*
 replay_pid*
 /gradle/
 /build/
-.npm_cache
+.npm_cache/
+*/.npm_cache/*
+.gradle/
+.idea/
+
