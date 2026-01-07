@@ -28,4 +28,4 @@ replay_pid*
 */.npm_cache/*
 .gradle/
 .idea/
-
+*.DS_Store
