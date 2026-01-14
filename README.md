@@ -14,14 +14,16 @@
     -   Intelligently  handles file replacement.
 -   **📋 State Management**:
     -   **Export**: Save your server's plugin state to a YAML file for backup or replication.
-    -   **Import**: Restore a server's state or replicate a setup on a new server with one command.
-    -   **Portable Format**: Uses simple identifiers (e.g., `modrinth:viaversion/5.2.1`) for easy sharing.
+    -   **Export**: Save your server's plugin state (versions + configurations) to a YAML file.
+    -   **Import**: Restore a server's state, including plugin files and configurations.
+    -   **Config Bundling**: Automatically bundles configuration files (filtered by extension) into the export.
+    -   **Unrecognised Plugins**: graceful handling of custom jars not found on Modrinth.
 -   **⚡ High Performance**:
     -   **Parallel Processing**: Downloads and API checks run asynchronously and in parallel.
-    -   **Persistent Caching**: Caches plugin metadata to `plugins/apt-mc/cache.json` to minimize API limits and speed up commands.
+    -   **Persistent Caching**: Caches plugin metadata to `plugins/apt-mc/cache.json`.
 -   **🖥️ User Friendly**:
-    -   **Action Bar Integration**: Shows download progress bars in the action bar to keep chat clean.
-    -   **Console Throttling**: intelligently updates console logs to avoid spamming the log file.
+    -   **Action Bar Integration**: Shows download progress bars in the action bar.
+    -   **Console Throttling**: intelligently updates console logs.
 
 ## Commands
 
@@ -32,18 +34,17 @@
 | `/apt install <plugin>` | Installs one or more plugins (e.g., `/apt install viaversion`). |
 | `/apt remove <plugin>` | Removes a plugin JAR file. |
 | `/apt search <query>` | Searches Modrinth for plugins. |
-| `/apt list` | Lists installed plugins and their versions (resolved via Modrinth). |
-| `/apt info <plugin>` | Shows detailed metadata, author, and dependencies for a plugin. |
-| `/apt export [file]` | Exports the current plugin state to a YAML manifest (default: `apt-manifest.yml`). |
-| `/apt import [file]` | Imports and installs plugins from a YAML manifest. |
+| `/apt list` | Lists installed plugins and their versions. |
+| `/apt info <plugin>` | Shows detailed metadata, author, and dependencies. |
+| `/apt export [file]` | Exports state (plugins + configs) to a YAML manifest. |
+| `/apt import [file]` | Imports plugins and restores configurations from a manifest. |
 
 ## Configuration
 
-The `config.yml` file allows you to tweak the interface:
+The `config.yml` file allows you to tweak the interface and export settings:
 
 ```yaml
 # Whether to use the action bar for status updates and progress bars.
-# Set to false to force all output to the chat.
 use-action-bar: true
 
 # Interval in seconds to update progress in the console.
@@ -51,11 +52,22 @@ console-progress-interval: 5
 
 # Enable references to the song "APT." by Rosé & Bruno Mars
 apt-song-references: true
+
+# Export configuration
+export:
+  # Mode: 'whitelist' or 'blacklist'
+  filter-mode: blacklist
+  # Extensions to filter
+  extensions:
+    - jar
+    - log
+    - lock
+    - old
 ```
 
 ## Manifest Format
 
-The export file uses a simple YAML structure, allowing you to manually define plugins by Project ID or version.
+The export file structure:
 
 ```yaml
 project-details:
@@ -63,11 +75,16 @@ project-details:
   author: Admin
 
 plugins:
-  # Install specific version
-  ViaVersion: "modrinth:viaversion/5.2.1"
-  
-  # Install latest version
-  Sodium: "modrinth:sodium/latest"
+  - file: ViaVersion-5.2.1.jar
+    source: "modrinth:viaversion/5.2.1"
+
+unrecognised:
+  - CustomPlugin.jar
+
+configs:
+  - plugin: ViaVersion
+    path: config.yml
+    data: "base64encodedstring..."
 ```
 
 ## Installation

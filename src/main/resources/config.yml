@@ -16,3 +16,15 @@ enable-hangar: false
 source-priority:
   - modrinth
   - hangar
+
+# Export configuration
+export:
+  # Mode: 'whitelist' (only include specified extensions) or 'blacklist' (exclude specified extensions)
+  filter-mode: blacklist
+  # List of extensions (without dot) to filter
+  extensions:
+    - jar
+    - log
+    - lock
+    - old
+

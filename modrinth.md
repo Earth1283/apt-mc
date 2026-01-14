@@ -1,74 +1,61 @@
-# apt-mc 📦
+# 📦 apt-mc
+**Package Management for Spigot/Paper Servers**
 
-**The Advanced Packaging Tool for Minecraft Servers.**
+> *Stop manually dragging JARs. Start managing plugins like a pro.*
 
-> *Stop manually downloading JARs. Start managing plugins like a pro.*
-
-`apt-mc` brings the familiar, powerful experience of the Linux command line (`apt-get`) to your Spigot/Paper server. Search, install, update, and manage your plugins directly from the game chat or console, all powered by the robust **Modrinth API**.
-
----
-
-## ✨ Features
-
-- **🚀 Seamless Installation**: Install plugins by name (`/apt install viaversion`) or bulk install multiple plugins at once.
-- **🧠 Smart Dependency Resolution**: Automatically detects and installs required dependencies for you.
-- **🔄 Auto-Updates**: Run `/apt upgrade` to scan your entire `plugins` folder, compare hashes with Modrinth, and download the latest versions automatically.
-- **⚡ High Performance**:
-  - **Parallel Downloads**: Updates and installs happen asynchronously.
-  - **Persistent Caching**: Caches plugin metadata to minimize API usage and speed up commands.
-- **🛡️ Safe Updates**: Updates are downloaded to the standard `update/` folder, ensuring a safe swap upon the next server restart.
-- **🖥️ Clean UI**:
-  - Uses the **Action Bar** for progress updates to prevent chat spam.
-  - Intelligent console throttling keeps your logs readable.
+`apt-mc` brings the power of the command line to Minecraft. Search, install, update, and backup your plugins directly from chat or console—powered by the **Modrinth API**.
 
 ---
 
-## 🛠️ Commands
+## 🔥 Features at a Glance
 
-| Command | Description |
+### 🚀 **Install & Update**
+- **One-Command Install**: `/apt install viaversion`
+- **Smart Upgrades**: `/apt upgrade` checks **all** plugins against Modrinth and downloads updates automatically.
+- **Dependency Handling**: Automatically installs required libraries.
+
+### 💾 **Backup & Restore**
+- **Full State Export**: Save your plugin list **and configurations** to a single YAML file.
+- **Instant Restore**: `/apt import backup.yml` restores your server entire plugin setup. 
+- **Migration Ready**: Perfect for moving servers or syncing dev/prod environments.
+
+### ⚡ **Performance First**
+- **Async & Parallel**: Downloads happen in the background. No lag.
+- **Smart Caching**: Caches metadata to keep commands instant.
+- **Clean UI**: meaningful progress bars in the Action Bar, no chat spam.
+
+---
+
+## 🛠️ Cheat Sheet
+
+| Command | Action |
 | :--- | :--- |
-| `/apt install <plugin...>` | Install one or more plugins (e.g., `/apt install luckperms vault`). Auto-resolves dependencies. |
-| `/apt remove <plugin>` | Delete a plugin JAR file from the server. |
-| `/apt upgrade` | Check **all** installed plugins for updates and download the latest versions. |
-| `/apt search <query>` | Search the Modrinth database for plugins. |
-| `/apt info <plugin>` | View detailed metadata, author, license, and dependencies. |
-| `/apt list` | List all installed plugins and their resolved versions. |
-| `/apt update` | Refresh the package cache (simulated parody command). |
-| `/apt help` | Show the help menu. |
+| `/apt install <name>` | Install plugins (e.g. `/apt install luckperms`) |
+| `/apt remove <name>` | Delete a plugin JAR |
+| `/apt upgrade` | Update all plugins to latest version |
+| `/apt search <query>` | Find plugins on Modrinth |
+| `/apt export [file]` | Save plugins + configs to file |
+| `/apt import [file]` | Restore plugins + configs from file |
 
 ---
 
-## ⚙️ Configuration
-
-The `config.yml` allows you to customize the interface:
+## ⚙️ Simple Config
+Permissions? None needed for OP. Config? Minimal.
 
 ```yaml
-# Whether to use the action bar for status updates and progress bars.
-# Set to false to force all output to the chat.
-use-action-bar: true
-
-# Interval in seconds to update progress in the console.
-console-progress-interval: 5
+# config.yml
+use-action-bar: true               # Keep chat clean
+console-progress-interval: 5       # No log spam
+export:
+  filter-mode: blacklist           # Don't export boring files
+  extensions: [jar, log, lock]
 ```
 
 ---
 
-## 📥 Installation
+### 📥 **Get Started**
+1. Download the JAR.
+2. Drop it in `plugins/`.
+3. Restart & run `/apt update`.
 
-1.  Download the latest **apt-mc** JAR from the Versions tab.
-2.  Drop it into your server's `plugins` folder.
-3.  Restart your server.
-4.  Run `/apt update` (just for fun!) and start installing.
-
----
-
-## 🤝 Open Source
-
-This project is open source! We welcome contributions, bug reports, and feature requests.
-
-*   **License**: MIT (or your chosen license)
-*   **Build System**: Gradle
-
----
-
-*Note: This plugin acts as a bridge to the Modrinth API. Please ensure you comply with the licenses of the plugins you install.*
+**[Report Bugs](https://github.com/Earth1283/apt-mc/issues) • [Source Code](https://github.com/Earth1283/apt-mc)**

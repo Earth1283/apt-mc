@@ -14,6 +14,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -682,69 +683,228 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         String filename = args.isEmpty() ? "apt-manifest.yml" : args.get(0);
         if (!filename.endsWith(".yml")) filename += ".yml";
         File file = new File(plugin.getDataFolder(), filename);
-        
-        sendStatus(sender, plugin.getMessage("status.exporting", Placeholder.unparsed("arg", filename)));
-        
-        Map<String, String> installed = packageManager.getInstalledPlugins();
-        if (installed.isEmpty()) {
-             sender.sendMessage(plugin.getMessage("status.export-empty"));
-             return;
-        }
 
-        Map<String, JsonObject> versions = resolveVersions(new ArrayList<>(installed.values()));
-        FileConfiguration yaml = new YamlConfiguration();
-        
-        // Add Header
-        yaml.set("project-details.title", "Server Export");
-        yaml.set("project-details.author", sender.getName());
-        
-        List<Map<String, String>> pluginList = new ArrayList<>();
-        int count = 0;
-        for (Map.Entry<String, String> entry : installed.entrySet()) {
-            String pluginFilename = entry.getKey();
-            String sha1 = entry.getValue();
+        sendStatus(sender, plugin.getMessage("status.exporting", Placeholder.unparsed("arg", filename)));
+
+        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+            Map<String, String> installed = packageManager.getInstalledPlugins();
+            if (installed.isEmpty()) {
+                sender.sendMessage(plugin.getMessage("status.export-empty"));
+                return;
+            }
+
+            Map<String, JsonObject> versions;
+            try {
+                versions = resolveVersions(new ArrayList<>(installed.values()));
+            } catch (Exception e) {
+                sender.sendMessage(plugin.getMessage("status.export-failed", Placeholder.unparsed("error", "Failed to resolve versions: " + e.getMessage())));
+                return;
+            }
+
+            FileConfiguration yaml = new YamlConfiguration();
+
+            // Add Header
+            yaml.set("project-details.title", "Server Export");
+            yaml.set("project-details.author", sender.getName());
+            yaml.set("project-details.created", System.currentTimeMillis());
+
+            List<Map<String, String>> pluginList = new ArrayList<>();
+            List<String> unrecognisedList = new ArrayList<>();
+            int count = 0;
+
+            for (Map.Entry<String, String> entry : installed.entrySet()) {
+                String pluginFilename = entry.getKey();
+                String sha1 = entry.getValue();
+
+                if (versions.containsKey(sha1)) {
+                    JsonObject v = versions.get(sha1);
+                    String projectId = v.get("project_id").getAsString();
+                    String verNum = v.get("version_number").getAsString();
+
+                    Map<String, String> entryMap = new LinkedHashMap<>();
+                    entryMap.put("file", pluginFilename);
+                    entryMap.put("source", "modrinth:" + projectId + "/" + verNum);
+                    pluginList.add(entryMap);
+                    count++;
+                } else {
+                    unrecognisedList.add(pluginFilename);
+                }
+            }
+            yaml.set("plugins", pluginList);
+            if (!unrecognisedList.isEmpty()) {
+                yaml.set("unrecognised", unrecognisedList);
+            }
+
+            // Config bundling
+            sendStatus(sender, plugin.getMessage("status.exporting-configs"));
+            Map<String, Map<String, String>> configsMap = new HashMap<>();
+            File pluginsDir = plugin.getDataFolder().getParentFile();
             
-            if (versions.containsKey(sha1)) {
-                JsonObject v = versions.get(sha1);
-                String projectId = v.get("project_id").getAsString();
-                String verNum = v.get("version_number").getAsString();
-                
-                Map<String, String> entryMap = new LinkedHashMap<>();
-                entryMap.put("file", pluginFilename);
-                entryMap.put("source", "modrinth:" + projectId + "/" + verNum);
-                pluginList.add(entryMap);
-                count++;
+            // Count total files first for progress
+            int totalFiles = countFilesRecursive(pluginsDir, pluginsDir);
+            java.util.concurrent.atomic.AtomicInteger processedFiles = new java.util.concurrent.atomic.AtomicInteger(0);
+            java.util.function.Consumer<Double> progressCallback = createProgressCallback(sender, "Exporting Configs");
+            
+            exportConfigsRecursive(pluginsDir, pluginsDir, configsMap, processedFiles, totalFiles, progressCallback);
+            progressCallback.accept(1.0); // Ensure 100% at end
+            
+            // Convert to Yaml structure
+            for (Map.Entry<String, Map<String, String>> entry : configsMap.entrySet()) {
+                String pluginName = entry.getKey();
+                for (Map.Entry<String, String> fileEntry : entry.getValue().entrySet()) {
+                    yaml.set("configs." + pluginName + "." + fileEntry.getKey().replace('.', '_'), fileEntry.getValue()); 
+                    // Note: YamlConfiguration treats dots as separators. We might need a better way to store paths.
+                    // Actually, let's store paths as keys, but we need to escape them or use a list of objects.
+                    // Storing as keys is cleaner if we can.
+                    // Let's change the structure to be list-based for safety against DOTs in filenames?
+                    // Or we can just use a list of objects under "configs".
+                    // The plan said:
+                    // configs:
+                    //   PluginName:
+                    //     "relative/path/to/config.yml": "base64String"
+                    // If "relative/path/to/config.yml" has dots, Spigot Yaml might interpret it deeply.
+                    // But MemorySection keys can contain dots if quoted? Spigot API is tricky.
+                    // Let's use a safe List structure for configs to avoid dot-ambiguity.
+                }
+            }
+            // Retrying config structure to be safer:
+            // configs:
+            //   - plugin: PluginName
+            //     path: relative/path/to/config.yml
+            //     data: <base64>
+            List<Map<String, String>> configExportList = new ArrayList<>();
+            for (Map.Entry<String, Map<String, String>> entry : configsMap.entrySet()) {
+                String pluginName = entry.getKey();
+                for (Map.Entry<String, String> fileEntry : entry.getValue().entrySet()) {
+                   Map<String, String> cMap = new LinkedHashMap<>();
+                   cMap.put("plugin", pluginName);
+                   cMap.put("path", fileEntry.getKey());
+                   cMap.put("data", fileEntry.getValue());
+                   configExportList.add(cMap);
+                }
+            }
+            yaml.set("configs", configExportList);
+
+
+            try {
+                yaml.save(file);
+                sender.sendMessage(plugin.getMessage("status.export-success", Placeholder.unparsed("arg1", String.valueOf(count)), Placeholder.unparsed("arg2", file.getPath())));
+                if (!unrecognisedList.isEmpty()) {
+                    sender.sendMessage(plugin.getMessage("status.export-unrecognised-warning", Placeholder.unparsed("arg", String.valueOf(unrecognisedList.size()))));
+                }
+            } catch (IOException e) {
+                sender.sendMessage(plugin.getMessage("status.export-failed", Placeholder.unparsed("error", e.getMessage())));
+            }
+        });
+    }
+
+    private int countFilesRecursive(File rootDir, File currentDir) {
+        File[] files = currentDir.listFiles();
+        if (files == null) return 0;
+        
+        List<String> extensions = plugin.getConfig().getStringList("export.extensions");
+        String mode = plugin.getConfig().getString("export.filter-mode", "blacklist");
+        int count = 0;
+        
+        for (File f : files) {
+            if (f.equals(plugin.getDataFolder())) continue;
+            
+            if (f.isDirectory()) {
+                count += countFilesRecursive(rootDir, f);
+            } else {
+                String ext = getExtension(f.getName());
+                boolean passes = false;
+                if (mode.equalsIgnoreCase("whitelist")) {
+                    passes = extensions.contains(ext);
+                } else {
+                    passes = !extensions.contains(ext);
+                }
+                if (passes) count++;
             }
         }
-        yaml.set("plugins", pluginList);
-        
-        try {
-            yaml.save(file);
-             sender.sendMessage(plugin.getMessage("status.export-success", Placeholder.unparsed("arg1", String.valueOf(count)), Placeholder.unparsed("arg2", file.getPath())));
-        } catch (IOException e) {
-             sender.sendMessage(plugin.getMessage("status.export-failed", Placeholder.unparsed("error", e.getMessage())));
+        return count;
+    }
+
+    private void exportConfigsRecursive(File rootDir, File currentDir, Map<String, Map<String, String>> configsMap, java.util.concurrent.atomic.AtomicInteger processed, int total, java.util.function.Consumer<Double> callback) {
+        File[] files = currentDir.listFiles();
+        if (files == null) return;
+
+        List<String> extensions = plugin.getConfig().getStringList("export.extensions");
+        String mode = plugin.getConfig().getString("export.filter-mode", "blacklist");
+
+        for (File f : files) {
+            // Skip apt-mc data folder
+            if (f.equals(plugin.getDataFolder())) continue;
+            
+            if (f.isDirectory()) {
+                exportConfigsRecursive(rootDir, f, configsMap, processed, total, callback);
+            } else {
+                String ext = getExtension(f.getName());
+                boolean passes = false;
+                if (mode.equalsIgnoreCase("whitelist")) {
+                    passes = extensions.contains(ext);
+                } else {
+                    passes = !extensions.contains(ext);
+                }
+                
+                if (passes) {
+                    // Update progress
+                    int p = processed.incrementAndGet();
+                    if (total > 0) callback.accept((double) p / total);
+
+                    // Determine which plugin this belongs to
+                    // If rootDir is plugins/, and file is plugins/PluginName/config.yml
+                    // We want key = PluginName, path = config.yml
+                    String relPath = rootDir.toURI().relativize(f.toURI()).getPath();
+                    // relPath will be "PluginName/config.yml"
+                    int slashIdx = relPath.indexOf('/');
+                    if (slashIdx > -1) {
+                         String pluginName = relPath.substring(0, slashIdx);
+                         String innerPath = relPath.substring(slashIdx + 1);
+                         
+                         try {
+                            byte[] bytes = java.nio.file.Files.readAllBytes(f.toPath());
+                            String b64 = Base64.getEncoder().encodeToString(bytes);
+                            
+                            configsMap.computeIfAbsent(pluginName, k -> new HashMap<>()).put(innerPath, b64);
+                         } catch (IOException e) {
+                             e.printStackTrace();
+                         }
+                    }
+                }
+            }
         }
+    }
+    
+    private String getExtension(String name) {
+        int i = name.lastIndexOf('.');
+        return i > 0 ? name.substring(i + 1) : "";
     }
 
     private void handleImport(CommandSender sender, List<String> args) {
         String filename = args.isEmpty() ? "apt-manifest.yml" : args.get(0);
         if (!filename.endsWith(".yml")) filename += ".yml";
         File file = new File(plugin.getDataFolder(), filename);
+        
+        plugin.getLogger().info("Starting import process for file: " + file.getAbsolutePath());
         performImport(sender, file);
     }
 
     public void performImport(CommandSender sender, File file) {
         if (!file.exists()) {
+             plugin.getLogger().warning("Manifest file not found: " + file.getAbsolutePath());
              sender.sendMessage(plugin.getMessage("errors.manifest-not-found", Placeholder.unparsed("arg", file.getName())));
              return;
         }
 
         FileConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        if (!yaml.contains("plugins")) {
+        if (!yaml.contains("plugins") && !yaml.contains("configs")) { // allow config-only backup?
+             plugin.getLogger().warning("Manifest invalid (no plugins/configs): " + file.getName());
              sender.sendMessage(plugin.getMessage("errors.invalid-manifest"));
              return;
         }
         
+        plugin.getLogger().info("Manifest valid. Reading content...");
         sender.sendMessage(plugin.getMessage("status.reading-manifest"));
         
         if (yaml.contains("project-details")) {
@@ -753,80 +913,125 @@ public class AptCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(plugin.getMessage("status.import-header", Placeholder.unparsed("title", title), Placeholder.unparsed("author", author)));
         }
         
+        // Handle unrecognised plugins warning
+        if (yaml.contains("unrecognised")) {
+            List<String> unrecognised = yaml.getStringList("unrecognised");
+            if (!unrecognised.isEmpty()) {
+                sender.sendMessage(Component.text("The following plugins are unrecognised and must be installed manually:", NamedTextColor.YELLOW));
+                for (String p : unrecognised) {
+                    sender.sendMessage(Component.text(" - " + p, NamedTextColor.WHITE));
+                }
+            }
+        }
+
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         final int[] installedCount = {0};
-        java.util.concurrent.ExecutorService downloadExecutor = java.util.concurrent.Executors.newFixedThreadPool(3);
+        final java.util.concurrent.ExecutorService downloadExecutor = yaml.contains("plugins") ? java.util.concurrent.Executors.newFixedThreadPool(3) : null;
         
-        List<Map<?, ?>> pluginList = yaml.getMapList("plugins");
-        for (Map<?, ?> entry : pluginList) {
-            String val = (String) entry.get("source");
-            if (val == null || !val.startsWith("modrinth:")) continue;
-            
-            String[] parts = val.substring(9).split("/");
-            if (parts.length < 2) continue;
-            
-            String projectId = parts[0];
-            String versionNum = parts[1];
-            
-            futures.add(CompletableFuture.runAsync(() -> {
-                try {
-                    JsonArray verList = ModrinthAPI.getVersions(projectId, List.of("spigot", "paper", "purpur", "bukkit"));
-                    JsonObject targetVer = null;
-                    if (verList != null && verList.size() > 0) {
-                        if (versionNum.equalsIgnoreCase("latest")) {
-                             targetVer = verList.get(0).getAsJsonObject();
-                        } else {
-                            for(JsonElement e : verList) {
-                                if (e.getAsJsonObject().get("version_number").getAsString().equals(versionNum)) {
-                                    targetVer = e.getAsJsonObject();
-                                    break;
+        if (yaml.contains("plugins")) {
+            List<Map<?, ?>> pluginList = yaml.getMapList("plugins");
+            for (Map<?, ?> entry : pluginList) {
+                String val = (String) entry.get("source");
+                if (val == null || !val.startsWith("modrinth:")) continue;
+
+                String[] parts = val.substring(9).split("/");
+                if (parts.length < 2) continue;
+
+                String projectId = parts[0];
+                String versionNum = parts[1];
+
+                futures.add(CompletableFuture.runAsync(() -> {
+                    try {
+                        JsonArray verList = ModrinthAPI.getVersions(projectId, List.of("spigot", "paper", "purpur", "bukkit"));
+                        JsonObject targetVer = null;
+                        if (verList != null && verList.size() > 0) {
+                            if (versionNum.equalsIgnoreCase("latest")) {
+                                 targetVer = verList.get(0).getAsJsonObject();
+                            } else {
+                                for(JsonElement e : verList) {
+                                    if (e.getAsJsonObject().get("version_number").getAsString().equals(versionNum)) {
+                                        targetVer = e.getAsJsonObject();
+                                        break;
+                                    }
                                 }
                             }
                         }
-                    }
-                    
-                    if (targetVer == null) {
-                         sender.sendMessage(plugin.getMessage("errors.package-not-found", Placeholder.unparsed("arg", "version " + versionNum + " of " + projectId)));
-                         return;
-                    }
-                    
-                    JsonArray files = targetVer.getAsJsonArray("files");
-                    if (files.size() == 0) return;
-                    
-                    JsonObject primary = files.get(0).getAsJsonObject();
-                    for(JsonElement f : files) {
-                        if (f.getAsJsonObject().has("primary") && f.getAsJsonObject().get("primary").getAsBoolean()) {
-                            primary = f.getAsJsonObject();
-                            break;
+
+                        if (targetVer == null) {
+                             sender.sendMessage(plugin.getMessage("errors.package-not-found", Placeholder.unparsed("arg", "version " + versionNum + " of " + projectId)));
+                             return;
                         }
+
+                        JsonArray files = targetVer.getAsJsonArray("files");
+                        if (files.size() == 0) return;
+
+                        JsonObject primary = files.get(0).getAsJsonObject();
+                        for(JsonElement f : files) {
+                            if (f.getAsJsonObject().has("primary") && f.getAsJsonObject().get("primary").getAsBoolean()) {
+                                primary = f.getAsJsonObject();
+                                break;
+                            }
+                        }
+                        
+                        String url = primary.get("url").getAsString();
+                        String fname = primary.get("filename").getAsString();
+                        long size = primary.get("size").getAsLong();
+                        
+                        // Check if installed
+                        String sha1 = primary.getAsJsonObject("hashes").get("sha1").getAsString();
+                        if (packageManager.getInstalledPlugins().containsValue(sha1)) {
+                            return; // Already installed
+                        }
+
+                        sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", fname)));
+                        packageManager.downloadFile(url, packageManager.getPluginsDir(), fname, size, createProgressCallback(sender, fname));
+                        sendStatus(sender, plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", fname)));
+                        synchronized(installedCount) { installedCount[0]++; }
+                        
+                    } catch (Exception e) {
+                         sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", projectId), Placeholder.unparsed("error", e.getMessage())));
                     }
-                    
-                    String fileName = primary.get("filename").getAsString();
-                    String url = primary.get("url").getAsString();
-                    long size = primary.get("size").getAsLong();
-                    
-                    File targetFile = new File(packageManager.getPluginsDir(), fileName);
-                    if (!targetFile.exists()) {
-                         sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", fileName)));
-                         packageManager.downloadFile(url, packageManager.getPluginsDir(), fileName, size, createProgressCallback(sender, fileName));
-                         sendStatus(sender, plugin.getMessage("status.installed-success", Placeholder.unparsed("arg", fileName)));
-                         synchronized(installedCount) { installedCount[0]++; }
-                    }
-                } catch (Exception e) {
-                    sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", projectId), Placeholder.unparsed("error", e.getMessage())));
-                }
-            }, downloadExecutor));
+                }, downloadExecutor));
+            }
+            sender.sendMessage(plugin.getMessage("status.importing-count", Placeholder.unparsed("arg", String.valueOf(futures.size()))));
         }
         
-        if (futures.isEmpty()) {
-            sender.sendMessage(plugin.getMessage("status.import-empty"));
-            downloadExecutor.shutdown();
-        } else {
-            sender.sendMessage(plugin.getMessage("status.importing-count", Placeholder.unparsed("arg", String.valueOf(futures.size()))));
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-            downloadExecutor.shutdown();
-            sender.sendMessage(plugin.getMessage("status.import-complete"));
-        }
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).thenRun(() -> {
+            if (downloadExecutor != null) {
+                downloadExecutor.shutdown();
+            }
+
+            // Restore Configs
+            if (yaml.contains("configs")) {
+                 sendStatus(sender, plugin.getMessage("status.exporting-configs")); // Re-using message for now
+                 List<Map<?, ?>> configs = yaml.getMapList("configs");
+                 for (Map<?, ?> entry : configs) {
+                     String pluginName = (String) entry.get("plugin");
+                     String subPath = (String) entry.get("path");
+                     String b64 = (String) entry.get("data");
+                     
+                     if (pluginName != null && subPath != null && b64 != null) {
+                        try {
+                             byte[] data = Base64.getDecoder().decode(b64);
+                             File targetFile = new File(plugin.getDataFolder().getParentFile(), pluginName + File.separator + subPath);
+                             if (!targetFile.getParentFile().exists()) targetFile.getParentFile().mkdirs();
+                             
+                             try (FileOutputStream fos = new FileOutputStream(targetFile)) {
+                                 fos.write(data);
+                             }
+                        } catch (Exception e) {
+                             sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", "Config " + pluginName + "/" + subPath), Placeholder.unparsed("error", e.getMessage())));
+                        }
+                     }
+                 }
+            }
+
+            if (installedCount[0] > 0 || yaml.contains("configs")) { // If plugins were installed OR configs were present
+                 sender.sendMessage(plugin.getMessage("status.import-complete"));
+            } else {
+                 sender.sendMessage(plugin.getMessage("status.import-empty"));
+            }
+        });
     }
 
     private void handleRemove(CommandSender sender, List<String> args) {
