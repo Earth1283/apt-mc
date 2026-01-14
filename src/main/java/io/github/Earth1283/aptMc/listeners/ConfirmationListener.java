@@ -1,4 +1,7 @@
-package io.github.Earth1283.aptMc;
+package io.github.Earth1283.aptMc.listeners;
+
+import io.github.Earth1283.aptMc.AptMc;
+import io.github.Earth1283.aptMc.commands.AptCommand;
 
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.CommandSender;

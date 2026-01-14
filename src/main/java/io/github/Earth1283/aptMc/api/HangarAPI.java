@@ -1,4 +1,4 @@
-package io.github.Earth1283.aptMc;
+package io.github.Earth1283.aptMc.api;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;

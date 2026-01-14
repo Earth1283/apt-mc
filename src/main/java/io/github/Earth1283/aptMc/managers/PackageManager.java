@@ -1,4 +1,4 @@
-package io.github.Earth1283.aptMc;
+package io.github.Earth1283.aptMc.managers;
 
 import java.io.BufferedInputStream;
 import java.io.File;

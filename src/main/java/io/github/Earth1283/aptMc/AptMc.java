@@ -7,6 +7,9 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import io.github.Earth1283.aptMc.commands.AptCommand;
+import io.github.Earth1283.aptMc.listeners.ConfirmationListener;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
