@@ -1,4 +1,4 @@
-package io.github.Earth1283.aptMc;
+55package io.github.Earth1283.aptMc;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
