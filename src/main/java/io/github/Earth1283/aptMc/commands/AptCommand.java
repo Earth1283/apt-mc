@@ -17,6 +17,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
     private final AptMc plugin;
     private final PackageManager packageManager;
     private ConfirmationListener confirmationListener;
+    private CompileCommand compileCommand;
     private final Map<String, SubCommand> subCommands = new HashMap<>();
 
     public AptCommand(AptMc plugin) {
@@ -40,10 +41,13 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         subCommands.put("remove", new RemoveCommand(plugin, packageManager));
         subCommands.put("export", new ExportCommand(plugin, packageManager));
         subCommands.put("import", new ImportCommand(plugin, packageManager));
+        compileCommand = new CompileCommand(plugin, packageManager);
+        subCommands.put("compile", compileCommand);
         // Install is initially null or not registered until listener is set?
         // Or we register a temporary one / null check?
         // Better to wait for listener or update logic.
-        // For now, if user runs install before listener set (onEnable), it might error or be missing.
+        // For now, if user runs install before listener set (onEnable), it might error
+        // or be missing.
         // It's fine, listener is set in onEnable immediately after.
     }
 
@@ -68,7 +72,8 @@ public class AptCommand implements CommandExecutor, TabCompleter {
             try {
                 cmd.execute(sender, subArgs);
             } catch (Exception e) {
-                sender.sendMessage(plugin.getMessage("errors.execution-error", Placeholder.unparsed("arg", e.getMessage())));
+                sender.sendMessage(
+                        plugin.getMessage("errors.execution-error", Placeholder.unparsed("arg", e.getMessage())));
                 e.printStackTrace();
             }
         });
@@ -83,9 +88,13 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    public CompileCommand getCompileCommand() {
+        return compileCommand;
+    }
+
     private void sendHelp(CommandSender sender) {
         if (plugin.getConfig().getBoolean("apt-song-references")) {
-             sender.sendMessage(plugin.getMessage("usage.song-ref"));
+            sender.sendMessage(plugin.getMessage("usage.song-ref"));
         }
         sender.sendMessage(plugin.getMessage("usage.header"));
         sender.sendMessage(plugin.getMessage("usage.install"));
@@ -97,6 +106,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(plugin.getMessage("usage.update"));
         sender.sendMessage(plugin.getMessage("usage.export"));
         sender.sendMessage(plugin.getMessage("usage.import"));
+        sender.sendMessage(plugin.getMessage("usage.compile"));
     }
 
     @Override

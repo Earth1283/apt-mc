@@ -28,3 +28,31 @@ export:
     - lock
     - old
 
+# Compile command configuration
+compile:
+  # Directory to store cloned repositories and build outputs
+  # Use ~ to represent the server root directory
+  cache-directory: "~/plugins/apt-mc/build-caches"
+  
+  # Default build tasks for Gradle projects (in order of preference)
+  default-gradle-tasks:
+    - "build"
+    - "shadowJar"
+    - "jar"
+  
+  # Default build goal for Maven projects
+  default-maven-goal: "package"
+  
+  # Whether to keep repositories after successful build
+  keep-repos-by-default: true
+  
+  # Timeout in seconds for build operations (0 = no timeout)
+  build-timeout: 600
+  
+  # Timeout in seconds for Git clone operations
+  clone-timeout: 300
+  
+  # Clone depth (1 = shallow clone, 0 = full history)
+  # Shallow clones are much faster for large repositories
+  clone-depth: 1
+

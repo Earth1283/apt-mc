@@ -1,4 +1,4 @@
-55package io.github.Earth1283.aptMc;
+package io.github.Earth1283.aptMc;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -24,12 +24,17 @@ public final class AptMc extends JavaPlugin {
         // Plugin startup logic
         updateConfig("config.yml");
         updateConfig("messages.yml");
-        
+
         AptCommand aptCommand = new AptCommand(this);
         ConfirmationListener confirmationListener = new ConfirmationListener(this, aptCommand);
         aptCommand.setConfirmationListener(confirmationListener);
         getServer().getPluginManager().registerEvents(confirmationListener, this);
-        
+
+        // Register compile input listener
+        io.github.Earth1283.aptMc.listeners.CompileInputListener compileInputListener = new io.github.Earth1283.aptMc.listeners.CompileInputListener(
+                this, aptCommand.getCompileCommand());
+        getServer().getPluginManager().registerEvents(compileInputListener, this);
+
         getCommand("apt").setExecutor(aptCommand);
     }
 
@@ -42,7 +47,8 @@ public final class AptMc extends JavaPlugin {
         File messagesFile = new File(getDataFolder(), "messages.yml");
         FileConfiguration messages = YamlConfiguration.loadConfiguration(messagesFile);
         String raw = messages.getString(key);
-        if (raw == null) return Component.text("Missing message: " + key);
+        if (raw == null)
+            return Component.text("Missing message: " + key);
         return MiniMessage.miniMessage().deserialize(raw, placeholders);
     }
 
@@ -59,7 +65,8 @@ public final class AptMc extends JavaPlugin {
             return;
         }
 
-        YamlConfiguration defConfig = YamlConfiguration.loadConfiguration(new InputStreamReader(defConfigStream, StandardCharsets.UTF_8));
+        YamlConfiguration defConfig = YamlConfiguration
+                .loadConfiguration(new InputStreamReader(defConfigStream, StandardCharsets.UTF_8));
         boolean changesMade = false;
 
         for (String key : defConfig.getKeys(true)) {
