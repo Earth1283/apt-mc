@@ -17,7 +17,7 @@ public class RemoveCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         if (args.isEmpty()) {
              sender.sendMessage(plugin.getMessage("usage.remove"));
             return;
@@ -47,6 +47,11 @@ public class RemoveCommand extends SubCommand {
         }
         
         File target = candidates.get(0);
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Remove " + target.getName())));
+            return;
+        }
+
         if (target.delete()) {
             sender.sendMessage(plugin.getMessage("status.removing", Placeholder.unparsed("arg", pkg + " (" + target.getName() + ")")));
             sender.sendMessage(plugin.getMessage("status.removal-complete"));
@@ -54,4 +59,6 @@ public class RemoveCommand extends SubCommand {
             sender.sendMessage(plugin.getMessage("errors.remove-failed", Placeholder.unparsed("arg", target.getName())));
         }
     }
+
+
 }

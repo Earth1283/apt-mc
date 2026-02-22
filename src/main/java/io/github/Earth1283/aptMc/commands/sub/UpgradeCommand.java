@@ -24,7 +24,7 @@ public class UpgradeCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         sendStatus(sender, plugin.getMessage("status.update-reading"));
         sendStatus(sender, plugin.getMessage("status.update-building"));
         sendStatus(sender, plugin.getMessage("status.update-state"));
@@ -75,6 +75,15 @@ public class UpgradeCommand extends SubCommand {
                 return;
             }
 
+            if (dryRun) {
+                sender.sendMessage(plugin.getMessage("status.dry-run-header"));
+                for (UpgradeInfo up : updates) {
+                    sender.sendMessage(plugin.getMessage("status.upgrade-list-item", Placeholder.unparsed("arg1", up.filename), Placeholder.unparsed("arg2", up.currentVersion), Placeholder.unparsed("arg3", up.newVersion)));
+                }
+                sender.sendMessage(plugin.getMessage("status.dry-run-complete"));
+                return;
+            }
+
             sender.sendMessage(plugin.getMessage("status.upgrade-list-header"));
             for (UpgradeInfo up : updates) {
                 sender.sendMessage(plugin.getMessage("status.upgrade-list-item", Placeholder.unparsed("arg1", up.filename), Placeholder.unparsed("arg2", up.currentVersion), Placeholder.unparsed("arg3", up.newVersion)));
@@ -113,6 +122,8 @@ public class UpgradeCommand extends SubCommand {
              sender.sendMessage(plugin.getMessage("errors.error-checking-pkg", Placeholder.unparsed("arg", "upgrades"), Placeholder.unparsed("error", e.getMessage())));
         }
     }
+
+
     
     private static class UpgradeInfo {
         String filename;

@@ -18,12 +18,17 @@ public class ListCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         packageManager.ensureDir();
         Map<String, String> installedPlugins = packageManager.getInstalledPlugins();
 
         if (installedPlugins.isEmpty()) {
             sender.sendMessage(plugin.getMessage("status.list-empty"));
+            return;
+        }
+
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "List installed plugins")));
             return;
         }
 
@@ -51,4 +56,5 @@ public class ListCommand extends SubCommand {
             sender.sendMessage(plugin.getMessage("errors.error-checking-pkg", Placeholder.unparsed("arg", "list"), Placeholder.unparsed("error", e.getMessage())));
         }
     }
+
 }

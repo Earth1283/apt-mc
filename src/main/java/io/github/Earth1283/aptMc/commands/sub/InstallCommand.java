@@ -28,7 +28,7 @@ public class InstallCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         if (args.isEmpty()) {
             sender.sendMessage(plugin.getMessage("errors.no-packages-specified"));
             return;
@@ -37,6 +37,10 @@ public class InstallCommand extends SubCommand {
         // Remote install check
         if (args.size() == 1 && args.get(0).matches("^(http|https|ftp)://.*\\.yml$")) {
             String url = args.get(0);
+            if (dryRun) {
+                sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Import manifest from " + url)));
+                return;
+            }
             try {
                 sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", "manifest")));
                 File tempDir = new File(plugin.getDataFolder(), "temp");
@@ -89,31 +93,52 @@ public class InstallCommand extends SubCommand {
         Set<String> installedIds = getInstalledProjectIds();
         Map<String, JsonObject> toInstallMap = new HashMap<>();
         List<String> priority = plugin.getConfig().getStringList("source-priority");
-        if (priority.isEmpty()) priority = List.of("modrinth", "hangar");
+        if (priority.isEmpty()) priority = List.of("modrinth", "hangar", "github");
 
         for (String pkgSlug : args) {
             boolean found = false;
             try {
-                for (String source : priority) {
-                    if (source.equalsIgnoreCase("modrinth")) {
-                        sendStatus(sender, plugin.getMessage("status.checking", Placeholder.unparsed("arg", pkgSlug + " on Modrinth")));
-                        JsonObject project = ModrinthAPI.getProject(pkgSlug);
-                        if (project != null) {
-                            resolveDependenciesRecursive(sender, project, toInstallMap, installedIds);
+                // Check if it's a GitHub slug (owner/repo)
+                if (pkgSlug.contains("/") && !pkgSlug.startsWith("http")) {
+                    sendStatus(sender, plugin.getMessage("status.checking", Placeholder.unparsed("arg", pkgSlug + " on GitHub")));
+                    JsonObject release = io.github.Earth1283.aptMc.api.GitHubAPI.getLatestRelease(pkgSlug);
+                    if (release != null) {
+                        JsonObject asset = io.github.Earth1283.aptMc.api.GitHubAPI.getPrimaryJarAsset(release);
+                        if (asset != null) {
+                            JsonObject githubInfo = new JsonObject();
+                            githubInfo.addProperty("source", "github");
+                            githubInfo.addProperty("slug", pkgSlug);
+                            githubInfo.addProperty("download_url", asset.get("browser_download_url").getAsString());
+                            githubInfo.addProperty("filename", asset.get("name").getAsString());
+                            githubInfo.addProperty("size", asset.get("size").getAsLong());
+                            toInstallMap.put("github:" + pkgSlug, githubInfo);
                             found = true;
-                            break;
                         }
-                    } else if (source.equalsIgnoreCase("hangar") && plugin.getConfig().getBoolean("enable-hangar")) {
-                        sendStatus(sender, plugin.getMessage("status.checking", Placeholder.unparsed("arg", pkgSlug + " on Hangar")));
-                        JsonObject hangarProject = HangarAPI.getProject(pkgSlug);
-                        if (hangarProject != null) {
-                            JsonObject versionInfo = HangarAPI.getLatestVersion(pkgSlug, "PAPER");
-                            if (versionInfo != null) {
-                                versionInfo.addProperty("source", "hangar");
-                                versionInfo.addProperty("hangar_slug", hangarProject.get("name").getAsString());
-                                toInstallMap.put(hangarProject.get("name").getAsString(), versionInfo);
+                    }
+                }
+
+                if (!found) {
+                    for (String source : priority) {
+                        if (source.equalsIgnoreCase("modrinth")) {
+                            sendStatus(sender, plugin.getMessage("status.checking", Placeholder.unparsed("arg", pkgSlug + " on Modrinth")));
+                            JsonObject project = ModrinthAPI.getProject(pkgSlug);
+                            if (project != null) {
+                                resolveDependenciesRecursive(sender, project, toInstallMap, installedIds);
                                 found = true;
                                 break;
+                            }
+                        } else if (source.equalsIgnoreCase("hangar") && plugin.getConfig().getBoolean("enable-hangar", true)) {
+                            sendStatus(sender, plugin.getMessage("status.checking", Placeholder.unparsed("arg", pkgSlug + " on Hangar")));
+                            JsonObject hangarProject = HangarAPI.getProject(pkgSlug);
+                            if (hangarProject != null) {
+                                JsonObject versionInfo = HangarAPI.getLatestVersion(pkgSlug, "PAPER");
+                                if (versionInfo != null) {
+                                    versionInfo.addProperty("source", "hangar");
+                                    versionInfo.addProperty("hangar_slug", hangarProject.get("name").getAsString());
+                                    toInstallMap.put("hangar:" + hangarProject.get("name").getAsString(), versionInfo);
+                                    found = true;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -133,20 +158,47 @@ public class InstallCommand extends SubCommand {
             return;
         }
 
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run-header"));
+            for (JsonObject pkg : toInstall) {
+                String name = getPkgName(pkg);
+                sender.sendMessage(plugin.getMessage("status.install-item", Placeholder.unparsed("arg", name)));
+            }
+            sender.sendMessage(plugin.getMessage("status.dry-run-complete"));
+            return;
+        }
+
         if (plugin.getConfig().getBoolean("apt-song-references")) {
             sender.sendMessage(plugin.getMessage("status.install-song-ref")); 
         }
 
         sender.sendMessage(plugin.getMessage("status.install-header"));
         for (JsonObject pkg : toInstall) {
-            String name = pkg.has("slug") ? pkg.get("slug").getAsString() : (pkg.has("hangar_slug") ? pkg.get("hangar_slug").getAsString() : "unknown");
+            String name = getPkgName(pkg);
             sender.sendMessage(plugin.getMessage("status.install-item", Placeholder.unparsed("arg", name)));
         }
         sender.sendMessage(plugin.getMessage("status.install-summary", Placeholder.unparsed("arg", String.valueOf(toInstall.size()))));
 
         List<CompletableFuture<Void>> installFutures = toInstall.stream()
                 .map(pkg -> CompletableFuture.runAsync(() -> {
-                    if (pkg.has("source") && pkg.get("source").getAsString().equals("hangar")) {
+                    String source = pkg.has("source") ? pkg.get("source").getAsString() : "modrinth";
+                    
+                    if (source.equals("github")) {
+                        try {
+                            String url = pkg.get("download_url").getAsString();
+                            String filename = pkg.get("filename").getAsString();
+                            long size = pkg.get("size").getAsLong();
+                            
+                            sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", filename)));
+                            packageManager.downloadFile(url, packageManager.getPluginsDir(), filename, size, createProgressCallback(sender, filename));
+                            sendStatus(sender, plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", filename)));
+                        } catch (Exception e) {
+                             sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", pkg.get("slug").getAsString()), Placeholder.unparsed("error", e.getMessage())));
+                        }
+                        return;
+                    }
+
+                    if (source.equals("hangar")) {
                         try {
                             String url = HangarAPI.getDownloadUrl(pkg, "PAPER");
                             String filename = HangarAPI.getFileName(pkg, "PAPER");
@@ -201,6 +253,13 @@ public class InstallCommand extends SubCommand {
         CompletableFuture.allOf(installFutures.toArray(new CompletableFuture[0])).join();
         sender.sendMessage(plugin.getMessage("status.install-complete"));
     }
+
+    private String getPkgName(JsonObject pkg) {
+        if (pkg.has("slug")) return pkg.get("slug").getAsString();
+        if (pkg.has("hangar_slug")) return pkg.get("hangar_slug").getAsString();
+        return "unknown";
+    }
+
 
     private Set<String> getInstalledProjectIds() {
         Map<String, String> installed = packageManager.getInstalledPlugins();

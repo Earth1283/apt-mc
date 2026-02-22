@@ -21,10 +21,15 @@ public class ExportCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         String filename = args.isEmpty() ? "apt-manifest.yml" : args.get(0);
         if (!filename.endsWith(".yml")) filename += ".yml";
         File file = new File(plugin.getDataFolder(), filename);
+
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Export to " + filename)));
+            return;
+        }
 
         sendStatus(sender, plugin.getMessage("status.exporting", Placeholder.unparsed("arg", filename)));
 
@@ -190,4 +195,5 @@ public class ExportCommand extends SubCommand {
              return !extensions.contains(ext);
         }
     }
+
 }

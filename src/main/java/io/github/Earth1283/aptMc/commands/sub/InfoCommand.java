@@ -22,12 +22,17 @@ public class InfoCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         if (args.isEmpty()) {
             sender.sendMessage(plugin.getMessage("usage.info"));
             return;
         }
         String pkg = args.get(0);
+
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Show info for " + pkg)));
+            return;
+        }
 
         try {
             JsonObject project = ModrinthAPI.getProject(pkg);
@@ -84,4 +89,5 @@ public class InfoCommand extends SubCommand {
              sender.sendMessage(plugin.getMessage("errors.error-checking-pkg", Placeholder.unparsed("arg", pkg), Placeholder.unparsed("error", e.getMessage())));
         }
     }
+
 }

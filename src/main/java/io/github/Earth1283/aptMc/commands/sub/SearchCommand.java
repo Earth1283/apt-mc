@@ -21,12 +21,17 @@ public class SearchCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         if (args.isEmpty()) {
             sender.sendMessage(plugin.getMessage("usage.search"));
             return;
         }
         String query = String.join(" ", args);
+
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Search for " + query)));
+            return;
+        }
         
         sendStatus(sender, plugin.getMessage("status.search-sorting"));
         sendStatus(sender, plugin.getMessage("status.search-text"));
@@ -102,4 +107,5 @@ public class SearchCommand extends SubCommand {
              sender.sendMessage(plugin.getMessage("errors.search-failed", Placeholder.unparsed("error", e.getMessage())));
         }
     }
+
 }

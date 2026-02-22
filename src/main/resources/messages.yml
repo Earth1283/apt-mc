@@ -119,6 +119,9 @@ status:
   compile-using-default-task: "<white>Using default build task: <green><task>"
   compile-auto-selected-jar: "<white>Automatically selected: <green><name> <gray>(<size>)"
   compile-build-log: "<dark_gray>│ <gray><line>"
+  dry-run: "<yellow>Dry-run: <white><arg>"
+  dry-run-header: "\n<yellow><bold>Dry-run: The following actions would be performed:"
+  dry-run-complete: "\n<yellow><bold>Dry-run complete. No changes were made."
   package-info:
     name: "<white>Package: <bold><arg>"
     id: "<white>ID: <arg>"

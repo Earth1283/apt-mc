@@ -19,7 +19,11 @@ public abstract class SubCommand {
         this.packageManager = packageManager;
     }
 
-    public abstract void execute(CommandSender sender, List<String> args);
+    public abstract void execute(CommandSender sender, List<String> args, boolean dryRun);
+
+    public void execute(CommandSender sender, List<String> args) {
+        execute(sender, args, false);
+    }
     
     public List<String> onTabComplete(CommandSender sender, List<String> args) {
         return Collections.emptyList();

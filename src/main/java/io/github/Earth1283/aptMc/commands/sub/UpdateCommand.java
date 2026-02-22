@@ -20,7 +20,11 @@ public class UpdateCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Update package lists")));
+            return;
+        }
         sendStatus(sender, plugin.getMessage("status.update-hit", Placeholder.unparsed("arg1", "1"), Placeholder.unparsed("arg2", "https://api.modrinth.com/v2/search stable")));
         try { Thread.sleep(200); } catch (InterruptedException ignored) {}
         
@@ -104,4 +108,5 @@ public class UpdateCommand extends SubCommand {
 
         sender.sendMessage(plugin.getMessage("status.up-to-date"));
     }
+
 }

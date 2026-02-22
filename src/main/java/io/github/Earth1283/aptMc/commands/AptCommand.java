@@ -67,10 +67,11 @@ public class AptCommand implements CommandExecutor, TabCompleter {
         }
 
         List<String> subArgs = new ArrayList<>(Arrays.asList(args).subList(1, args.length));
+        boolean dryRun = subArgs.removeIf(arg -> arg.equalsIgnoreCase("--dry-run"));
 
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             try {
-                cmd.execute(sender, subArgs);
+                cmd.execute(sender, subArgs, dryRun);
             } catch (Exception e) {
                 sender.sendMessage(
                         plugin.getMessage("errors.execution-error", Placeholder.unparsed("arg", e.getMessage())));

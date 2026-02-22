@@ -31,7 +31,7 @@ public class CompileCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         if (args.isEmpty()) {
             sender.sendMessage(plugin.getMessage("errors.compile-no-url"));
             return;
@@ -55,12 +55,19 @@ public class CompileCommand extends SubCommand {
             return;
         }
 
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Compile from " + gitUrl + " (branch: " + branch + ")")));
+            return;
+        }
+
         // Determine if interactive mode (player) or automatic mode (console)
         boolean interactive = sender instanceof Player;
 
         // Start compilation process
         compileFromGit(sender, gitUrl, branch, interactive);
     }
+
+
 
     private boolean isValidGitUrl(String url) {
         return url.matches("^(https?|git)://.*\\.git$") ||

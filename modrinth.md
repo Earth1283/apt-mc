@@ -10,9 +10,10 @@
 ## 🔥 Features at a Glance
 
 ### 🚀 **Install & Update**
-- **One-Command Install**: `/apt install viaversion`
+- **One-Command Install**: `/apt install viaversion`, `/apt install user/repo` (GitHub), or Hangar slugs.
 - **Smart Upgrades**: `/apt upgrade` checks **all** plugins against Modrinth and downloads updates automatically.
 - **Dependency Handling**: Automatically installs required libraries.
+- **Dry Run Safety**: Use `--dry-run` with any command to see changes before they happen.
 
 ### 💾 **Backup & Restore**
 - **Full State Export**: Save your plugin list **and configurations** to a single YAML file.

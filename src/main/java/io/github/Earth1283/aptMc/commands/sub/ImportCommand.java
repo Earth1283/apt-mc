@@ -29,7 +29,7 @@ public class ImportCommand extends SubCommand {
     }
 
     @Override
-    public void execute(CommandSender sender, List<String> args) {
+    public void execute(CommandSender sender, List<String> args, boolean dryRun) {
         String filename = args.isEmpty() ? "apt-manifest.yml" : args.get(0);
         if (!filename.endsWith(".yml")) filename += ".yml";
         File file = new File(plugin.getDataFolder(), filename);
@@ -39,8 +39,15 @@ public class ImportCommand extends SubCommand {
              return;
         }
         
+        if (dryRun) {
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Import from " + filename)));
+            return;
+        }
+
         performImport(sender, file);
     }
+
+
     
     public void performImport(CommandSender sender, File file) {
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {

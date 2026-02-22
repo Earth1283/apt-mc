@@ -6,8 +6,9 @@
 
 ## Features
 
--   **📦 Install & Remove**: Easily install plugins by their Modrinth slug and remove them by filename.
--   **🔍 Search**: Search the Modrinth database for plugins directly from chat.
+-   **📦 Install & Remove**: Easily install plugins by their Modrinth slug, Hangar slug, or GitHub repo (`user/repo`) and remove them by filename.
+-   **🔍 Search**: Search the Modrinth and Hangar databases for plugins directly from chat.
+-   **🛡️ Dry Run**: Use the `--dry-run` flag with most commands to see what *would* happen without making any changes.
 -   **🔄 Upgrade System**: 
     -   `apt upgrade` checks all installed plugins against Modrinth.
     -   Downloads updates to the `update/` folder for safe installation on restart.
@@ -26,6 +27,8 @@
     -   **Console Throttling**: intelligently updates console logs.
 
 ## Commands
+
+Most commands support the `--dry-run` flag to simulate actions without modifying files.
 
 | Command | Description |
 | :--- | :--- |
