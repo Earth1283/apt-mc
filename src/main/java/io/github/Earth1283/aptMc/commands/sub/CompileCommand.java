@@ -153,7 +153,13 @@ public class CompileCommand extends SubCommand {
                 cleanup(repoDir);
             }
 
-        } catch (GitAPIException | IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            sender.sendMessage(plugin.getMessage("errors.compile-clone-failed",
+                    Placeholder.unparsed("error", "Interrupted")));
+            plugin.getLogger().log(Level.WARNING, "Compile interrupted for " + gitUrl, e);
+            cleanup(repoDir);
+        } catch (GitAPIException | IOException e) {
             sender.sendMessage(plugin.getMessage("errors.compile-clone-failed",
                     Placeholder.unparsed("error", e.getMessage())));
             plugin.getLogger().log(Level.SEVERE, "Compile failed for " + gitUrl, e);

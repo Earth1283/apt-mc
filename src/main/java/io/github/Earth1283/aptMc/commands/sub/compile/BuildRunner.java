@@ -68,9 +68,13 @@ public final class BuildRunner {
             } catch (IOException ignored) {}
         });
 
-        boolean finished = timeout > 0
-                ? process.waitFor(timeout, TimeUnit.SECONDS)
-                : (process.waitFor() == 0 || true);
+        boolean finished;
+        if (timeout > 0) {
+            finished = process.waitFor(timeout, TimeUnit.SECONDS);
+        } else {
+            process.waitFor();
+            finished = true;
+        }
 
         if (!finished) {
             process.destroyForcibly();
@@ -78,7 +82,8 @@ public final class BuildRunner {
             return false;
         }
 
-        try { reader.get(5, TimeUnit.SECONDS); } catch (Exception ignored) {}
+        // Drain remaining output before reading fullOutput
+        try { reader.get(10, TimeUnit.SECONDS); } catch (Exception ignored) {}
 
         int exitCode = process.exitValue();
         if (exitCode != 0) {
