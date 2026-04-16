@@ -21,6 +21,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 
 public class ImportCommand extends SubCommand {
 
@@ -190,7 +191,7 @@ public class ImportCommand extends SubCommand {
                 });
             } catch (Exception e) {
                 sender.sendMessage(plugin.getMessage("errors.execution-error", Placeholder.unparsed("arg", e.getMessage())));
-                e.printStackTrace();
+                plugin.getLogger().log(Level.SEVERE, "Import failed unexpectedly", e);
             }
         });
     }

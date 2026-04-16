@@ -9,6 +9,7 @@ import org.bukkit.command.CommandSender;
 import com.google.gson.JsonObject;
 
 import java.util.*;
+import java.util.logging.Level;
 
 public abstract class SubCommand {
     protected final AptMc plugin;
@@ -91,7 +92,7 @@ public abstract class SubCommand {
                     packageManager.updateCache(newCacheEntries);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                plugin.getLogger().log(Level.WARNING, "Failed to resolve version hashes from Modrinth", e);
             }
         }
         return results;

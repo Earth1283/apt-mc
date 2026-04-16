@@ -12,6 +12,7 @@ import org.bukkit.command.TabCompleter;
 
 import java.io.File;
 import java.util.*;
+import java.util.logging.Level;
 
 public class AptCommand implements CommandExecutor, TabCompleter {
     private final AptMc plugin;
@@ -75,7 +76,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
             } catch (Exception e) {
                 sender.sendMessage(
                         plugin.getMessage("errors.execution-error", Placeholder.unparsed("arg", e.getMessage())));
-                e.printStackTrace();
+                plugin.getLogger().log(Level.SEVERE, "Unhandled exception in apt command", e);
             }
         });
 
