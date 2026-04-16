@@ -1,12 +1,10 @@
 package io.github.Earth1283.aptMc.api;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.URLEncoder;
@@ -14,9 +12,6 @@ import java.nio.charset.StandardCharsets;
 
 public class HangarAPI {
     private static final String BASE_URL = "https://hangar.papermc.io/api/v1";
-    private static final String USER_AGENT = "apt-mc/1.2 (parody-cli)";
-    private static final HttpClient client = HttpClient.newHttpClient();
-    private static final Gson gson = new Gson();
 
     public static JsonObject search(String query, int limit, int offset) throws IOException, InterruptedException {
         String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
@@ -24,33 +19,33 @@ public class HangarAPI {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("User-Agent", USER_AGENT)
+                .header("User-Agent", HttpClientProvider.USER_AGENT)
                 .GET()
                 .build();
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClientProvider.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IOException("Hangar API search failed: " + response.statusCode());
         }
 
-        return gson.fromJson(response.body(), JsonObject.class);
+        return HttpClientProvider.GSON.fromJson(response.body(), JsonObject.class);
     }
 
     public static JsonObject getProject(String slug) throws IOException, InterruptedException {
         String url = String.format("%s/projects/%s", BASE_URL, slug);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("User-Agent", USER_AGENT)
+                .header("User-Agent", HttpClientProvider.USER_AGENT)
                 .GET()
                 .build();
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClientProvider.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() == 404) return null;
         if (response.statusCode() != 200) {
             throw new IOException("Hangar API getProject failed: " + response.statusCode());
         }
 
-        return gson.fromJson(response.body(), JsonObject.class);
+        return HttpClientProvider.GSON.fromJson(response.body(), JsonObject.class);
     }
 
     public static JsonObject getLatestVersion(String slug, String channel) throws IOException, InterruptedException {
@@ -66,16 +61,16 @@ public class HangarAPI {
         
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("User-Agent", USER_AGENT)
+                .header("User-Agent", HttpClientProvider.USER_AGENT)
                 .GET()
                 .build();
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = HttpClientProvider.CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() != 200) {
             throw new IOException("Hangar API getVersions failed: " + response.statusCode());
         }
 
-        JsonObject json = gson.fromJson(response.body(), JsonObject.class);
+        JsonObject json = HttpClientProvider.GSON.fromJson(response.body(), JsonObject.class);
         JsonArray results = json.getAsJsonArray("result");
         if (results.size() > 0) {
             return results.get(0).getAsJsonObject();
