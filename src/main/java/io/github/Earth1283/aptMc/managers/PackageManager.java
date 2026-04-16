@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import io.github.Earth1283.aptMc.api.HttpClientProvider;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -15,7 +16,6 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.MessageDigest;
-import java.io.BufferedInputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -28,7 +28,6 @@ public class PackageManager {
     private final File cacheFile;
     private Map<String, JsonObject> cache;
     private final Logger logger;
-    private static final String USER_AGENT = HttpClientProvider.USER_AGENT;
 
     public PackageManager(File dataFolder, File pluginsDir, Logger logger) {
         this.dataFolder = dataFolder;
@@ -96,7 +95,7 @@ public class PackageManager {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("User-Agent", USER_AGENT)
+                .header("User-Agent", HttpClientProvider.USER_AGENT)
                 .GET()
                 .build();
 

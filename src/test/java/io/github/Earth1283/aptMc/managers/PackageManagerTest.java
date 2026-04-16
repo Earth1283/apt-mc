@@ -19,7 +19,7 @@ class PackageManagerTest {
     @Test
     void calculateSha1_knownContent(@TempDir Path tempDir) throws IOException {
         File f = tempDir.resolve("hello.txt").toFile();
-        Files.writeString(f.toPath(), "hello");
+        Files.writeString(f.toPath(), "hello", java.nio.charset.StandardCharsets.UTF_8);
         PackageManager pm = new PackageManager(tempDir.toFile(), tempDir.toFile(), LOGGER);
         // SHA-1("hello") = aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d
         assertEquals("aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d", pm.calculateSha1(f));
@@ -40,7 +40,7 @@ class PackageManagerTest {
     }
 
     @Test
-    void updateCache_doesNotSaveTwice(@TempDir Path tempDir) throws IOException {
+    void updateCache_persistsToFile(@TempDir Path tempDir) throws IOException {
         PackageManager pm = new PackageManager(tempDir.toFile(), tempDir.toFile(), LOGGER);
         JsonObject obj = new JsonObject();
         obj.addProperty("x", 1);
@@ -49,6 +49,21 @@ class PackageManagerTest {
         assertTrue(cache.exists());
         String content = Files.readString(cache.toPath());
         assertTrue(content.contains("key1"));
+    }
+
+    @Test
+    void updateCache_batchUpdatesArePersisted(@TempDir Path tempDir) {
+        PackageManager pm = new PackageManager(tempDir.toFile(), tempDir.toFile(), LOGGER);
+        java.util.Map<String, JsonObject> entries = new java.util.HashMap<>();
+        JsonObject a = new JsonObject(); a.addProperty("name", "PluginA");
+        JsonObject b = new JsonObject(); b.addProperty("name", "PluginB");
+        entries.put("hash1", a);
+        entries.put("hash2", b);
+        pm.updateCache(entries);
+
+        PackageManager pm2 = new PackageManager(tempDir.toFile(), tempDir.toFile(), LOGGER);
+        assertNotNull(pm2.getCachedInfo("hash1"));
+        assertNotNull(pm2.getCachedInfo("hash2"));
     }
 
     @Test
