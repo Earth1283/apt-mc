@@ -1,16 +1,9 @@
 package io.github.Earth1283.aptMc.managers;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
-import java.io.BufferedInputStream;
+import io.github.Earth1283.aptMc.api.HttpClientProvider;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -19,27 +12,29 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.security.MessageDigest;
+import java.io.BufferedInputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class PackageManager {
     private final File dataFolder;
     private final File pluginsDir;
     private final File cacheFile;
     private Map<String, JsonObject> cache;
-    private static final String USER_AGENT = "apt-mc/1.2 (parody-cli)";
-    private static final HttpClient client = HttpClient.newHttpClient();
-    private static final Gson gson = new Gson();
+    private final Logger logger;
+    private static final String USER_AGENT = HttpClientProvider.USER_AGENT;
 
-    public PackageManager(File dataFolder, File pluginsDir) {
+    public PackageManager(File dataFolder, File pluginsDir, Logger logger) {
         this.dataFolder = dataFolder;
         this.pluginsDir = pluginsDir;
         this.cacheFile = new File(dataFolder, "cache.json");
+        this.logger = logger;
         this.cache = new HashMap<>();
         loadCache();
     }
@@ -48,12 +43,12 @@ public class PackageManager {
         if (cacheFile.exists()) {
             try (FileReader reader = new FileReader(cacheFile)) {
                 Type type = new TypeToken<Map<String, JsonObject>>(){}.getType();
-                Map<String, JsonObject> loaded = gson.fromJson(reader, type);
+                Map<String, JsonObject> loaded = HttpClientProvider.GSON.fromJson(reader, type);
                 if (loaded != null) {
                     this.cache = loaded;
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.log(Level.WARNING, "Failed to load package cache", e);
             }
         }
     }
@@ -61,9 +56,9 @@ public class PackageManager {
     public void saveCache() {
         if (!dataFolder.exists()) dataFolder.mkdirs();
         try (FileWriter writer = new FileWriter(cacheFile)) {
-            gson.toJson(cache, writer);
+            HttpClientProvider.GSON.toJson(cache, writer);
         } catch (IOException e) {
-            e.printStackTrace();
+            logger.log(Level.WARNING, "Failed to save package cache", e);
         }
     }
 
@@ -73,15 +68,9 @@ public class PackageManager {
 
     public void updateCache(String sha1, JsonObject info) {
         cache.put(sha1, info);
-        saveCache(); // Save on every update or batch? simple to save on update for now or let caller trigger.
-        // Actually, saving on every put might be slow if batching. 
-        // I'll make this just put, and let caller or shutdown save? 
-        // Or just save. It's not high frequency.
-        // Let's just save.
         saveCache();
     }
-    
-    // Batch update
+
     public void updateCache(Map<String, JsonObject> newEntries) {
         cache.putAll(newEntries);
         saveCache();
@@ -104,14 +93,14 @@ public class PackageManager {
     public void downloadFile(String url, File destDir, String filename, long size, Consumer<Double> progressCallback) throws IOException, InterruptedException {
         if (!destDir.exists()) destDir.mkdirs();
         File destPath = new File(destDir, filename);
-        
+
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("User-Agent", USER_AGENT)
                 .GET()
                 .build();
 
-        HttpResponse<java.io.InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<java.io.InputStream> response = HttpClientProvider.CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() != 200) {
             throw new IOException("Download failed with status " + response.statusCode());
         }
@@ -135,7 +124,7 @@ public class PackageManager {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-1");
             try (BufferedInputStream bis = new BufferedInputStream(new FileInputStream(file))) {
-                byte[] buffer = new byte[8192]; // 8KB buffer
+                byte[] buffer = new byte[8192];
                 int count;
                 while ((count = bis.read(buffer)) > 0) {
                     digest.update(buffer, 0, count);
@@ -166,7 +155,7 @@ public class PackageManager {
                 try {
                     plugins.put(f.getName(), calculateSha1(f));
                 } catch (IOException e) {
-                    // Ignore read errors
+                    logger.log(Level.WARNING, "Could not read plugin file: " + f.getName(), e);
                 }
             }
         }

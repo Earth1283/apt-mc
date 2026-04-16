@@ -22,7 +22,7 @@ public class AptCommand implements CommandExecutor, TabCompleter {
 
     public AptCommand(AptMc plugin) {
         this.plugin = plugin;
-        this.packageManager = new PackageManager(plugin.getDataFolder(), plugin.getDataFolder().getParentFile());
+        this.packageManager = new PackageManager(plugin.getDataFolder(), plugin.getDataFolder().getParentFile(), plugin.getLogger());
         registerCommands();
     }
 
