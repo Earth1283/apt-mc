@@ -38,17 +38,60 @@ public final class BuildRunner {
     public static boolean run(File repoDir, BuildSystem buildSystem, String task,
                               int timeout, Consumer<String> lineCallback) throws IOException, InterruptedException {
         ProcessBuilder pb;
+
+        // Resolve java executable from current JVM to ensure we use the same running environment
+        String javaHome = System.getProperty("java.home");
+        File javaBin = new File(new File(javaHome, "bin"), "java");
+        if (!javaBin.exists()) {
+            javaBin = new File(new File(javaHome, "bin"), "java.exe");
+        }
+        String javaPath = javaBin.exists() ? javaBin.getAbsolutePath() : "java";
+
         if (buildSystem == BuildSystem.GRADLE) {
-            File gradlew = new File(repoDir, "gradlew");
-            if (!gradlew.exists()) gradlew = new File(repoDir, "gradlew.bat");
-            if (gradlew.exists()) {
-                gradlew.setExecutable(true);
-                pb = new ProcessBuilder(gradlew.getAbsolutePath(), task, "--console=plain");
+            File wrapperJar = new File(repoDir, "gradle/wrapper/gradle-wrapper.jar");
+            if (wrapperJar.exists()) {
+                // Execute Gradle Wrapper Main class directly using java to bypass shell execution, shebang, CRLF, and chmod issues in Docker mounts
+                pb = new ProcessBuilder(
+                        javaPath,
+                        "-classpath",
+                        wrapperJar.getAbsolutePath(),
+                        "org.gradle.wrapper.GradleWrapperMain",
+                        task,
+                        "--console=plain",
+                        "--no-daemon"
+                );
             } else {
-                pb = new ProcessBuilder("gradle", task, "--console=plain");
+                File gradlew = new File(repoDir, "gradlew");
+                if (!gradlew.exists()) gradlew = new File(repoDir, "gradlew.bat");
+                if (gradlew.exists()) {
+                    gradlew.setExecutable(true);
+                    pb = new ProcessBuilder(gradlew.getAbsolutePath(), task, "--console=plain", "--no-daemon");
+                } else {
+                    pb = new ProcessBuilder("gradle", task, "--console=plain", "--no-daemon");
+                }
             }
         } else {
-            pb = new ProcessBuilder("mvn", task, "-B");
+            File mavenWrapperJar = new File(repoDir, ".mvn/wrapper/maven-wrapper.jar");
+            if (mavenWrapperJar.exists()) {
+                // Execute Maven Wrapper Main class directly using java
+                pb = new ProcessBuilder(
+                        javaPath,
+                        "-classpath",
+                        mavenWrapperJar.getAbsolutePath(),
+                        "org.apache.maven.wrapper.MavenWrapperMain",
+                        task,
+                        "-B"
+                );
+            } else {
+                File mvnw = new File(repoDir, "mvnw");
+                if (!mvnw.exists()) mvnw = new File(repoDir, "mvnw.cmd");
+                if (mvnw.exists()) {
+                    mvnw.setExecutable(true);
+                    pb = new ProcessBuilder(mvnw.getAbsolutePath(), task, "-B");
+                } else {
+                    pb = new ProcessBuilder("mvn", task, "-B");
+                }
+            }
         }
 
         pb.directory(repoDir);
