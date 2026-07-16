@@ -1,7 +1,8 @@
 name: apt-mc
-version: '1.3'
+version: '1.4'
 main: io.github.Earth1283.aptMc.AptMc
 api-version: '1.21'
+description: The missing package manager for Minecraft
 load: STARTUP
 authors: [ Earth1283 ]
 commands:
