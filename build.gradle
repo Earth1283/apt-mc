@@ -36,6 +36,7 @@ test {
 
 shadowJar {
     archiveClassifier.set('')
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     relocate 'com.google.gson', 'io.github.Earth1283.aptMc.libs.gson'
     relocate 'org.eclipse.jgit', 'io.github.Earth1283.aptMc.libs.jgit'
 }

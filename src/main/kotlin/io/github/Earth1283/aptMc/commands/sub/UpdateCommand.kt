@@ -47,7 +47,7 @@ class UpdateCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                 if (versions.size() > 0) {
                     val latest = versions[0].asJsonObject
                     val latestVer = latest.get("version_number").asString
-                    val currentVer = plugin.description.version
+                    val currentVer = plugin.pluginMeta.version
 
                     if (!latestVer.equals(currentVer, ignoreCase = true)) {
                         updateFound = true
@@ -67,7 +67,7 @@ class UpdateCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
 
         if (updateFound && latestVersionObj != null) {
             val latestVer = latestVersionObj.get("version_number").asString
-            val currentVer = plugin.description.version
+            val currentVer = plugin.pluginMeta.version
             sendStatus(sender, plugin.getMessage("status.self-update-found", Placeholder.unparsed("arg1", latestVer), Placeholder.unparsed("arg2", currentVer)))
 
             val files = latestVersionObj.getAsJsonArray("files")

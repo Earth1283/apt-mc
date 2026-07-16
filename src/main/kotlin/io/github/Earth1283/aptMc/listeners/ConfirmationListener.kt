@@ -2,6 +2,8 @@ package io.github.Earth1283.aptMc.listeners
 
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.commands.AptCommand
+import io.papermc.paper.event.player.AsyncChatEvent
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.command.CommandSender
 import org.bukkit.command.ConsoleCommandSender
 import org.bukkit.entity.Player
@@ -9,7 +11,6 @@ import org.bukkit.event.Cancellable
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
-import org.bukkit.event.player.AsyncPlayerChatEvent
 import org.bukkit.event.server.ServerCommandEvent
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -38,8 +39,8 @@ class ConfirmationListener(
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
-    fun onChat(event: AsyncPlayerChatEvent) {
-        handleInput(event.player, event.message, event)
+    fun onChat(event: AsyncChatEvent) {
+        handleInput(event.player, PlainTextComponentSerializer.plainText().serialize(event.message()), event)
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
