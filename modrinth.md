@@ -17,8 +17,9 @@
 
 ### 💾 **Backup & Restore**
 - **Full State Export**: Save your plugin list **and configurations** to a single YAML file.
-- **Instant Restore**: `/apt import backup.yml` restores your server entire plugin setup. 
+- **Instant Restore**: `/apt import backup.yml` restores your server entire plugin setup — `.zip` manifests auto-detected too, no manual unzip needed.
 - **Migration Ready**: Perfect for moving servers or syncing dev/prod environments.
+- **Flexible Export**: `--include-all` bundles unrecognised jars too (use at your own risk), `--compress` zips it down, `--no-configs` skips config bundling.
 
 ### ⚡ **Performance First**
 - **Async & Parallel**: Downloads happen in the background. No lag.
@@ -35,8 +36,8 @@
 | `/apt remove <name>` | Delete a plugin JAR |
 | `/apt upgrade` | Update all plugins to latest version |
 | `/apt search <query>` | Find plugins on Modrinth |
-| `/apt export [file]` | Save plugins + configs to file |
-| `/apt import [file]` | Restore plugins + configs from file |
+| `/apt export [file] [--include-all\|--compress\|--no-configs]` | Save plugins + configs to file |
+| `/apt import [file]` | Restore plugins + configs from file (`.yml`/`.zip`) |
 
 ---
 

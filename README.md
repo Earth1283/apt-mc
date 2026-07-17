@@ -14,11 +14,11 @@
     -   Downloads updates to the `update/` folder for safe installation on restart.
     -   Intelligently  handles file replacement.
 -   **📋 State Management**:
-    -   **Export**: Save your server's plugin state to a YAML file for backup or replication.
     -   **Export**: Save your server's plugin state (versions + configurations) to a YAML file.
-    -   **Import**: Restore a server's state, including plugin files and configurations.
-    -   **Config Bundling**: Automatically bundles configuration files (filtered by extension) into the export.
-    -   **Unrecognised Plugins**: graceful handling of custom jars not found on Modrinth.
+    -   **Import**: Restore a server's state, including plugin files and configurations. Auto-detects `.zip` manifests, no manual decompression needed.
+    -   **Config Bundling**: Automatically bundles configuration files (filtered by extension) into the export. Skip with `--no-configs`.
+    -   **Unrecognised Plugins**: graceful handling of custom jars not found on Modrinth. Bundle them anyway with `--include-all` (use at your own risk).
+    -   **Compression**: `--compress` zips the manifest to cut file size.
 -   **⚡ High Performance**:
     -   **Parallel Processing**: Downloads and API checks run asynchronously and in parallel.
     -   **Persistent Caching**: Caches plugin metadata to `plugins/apt-mc/cache.json`.
@@ -39,8 +39,16 @@ Most commands support the `--dry-run` flag to simulate actions without modifying
 | `/apt search <query>` | Searches Modrinth for plugins. |
 | `/apt list` | Lists installed plugins and their versions. |
 | `/apt info <plugin>` | Shows detailed metadata, author, and dependencies. |
-| `/apt export [file]` | Exports state (plugins + configs) to a YAML manifest. |
-| `/apt import [file]` | Imports plugins and restores configurations from a manifest. |
+| `/apt export [file] [--include-all] [--compress] [--no-configs]` | Exports state (plugins + configs) to a YAML manifest. |
+| `/apt import [file]` | Imports plugins and restores configurations from a manifest (`.yml` or `.zip`, auto-detected). |
+
+### Export flags
+
+| Flag | Effect |
+| :--- | :--- |
+| `--include-all` | Embeds unrecognised (non-Modrinth) plugin jars as base64 into the manifest instead of just listing their names. Bundles arbitrary jars into the file — use at your own risk. |
+| `--compress` | Zips the manifest to `<file>.zip` instead of writing plain `.yml`. Reduces file size, especially with bundled configs/jars. |
+| `--no-configs` | Skips config bundling, exporting plugin versions only. |
 
 ## Configuration
 
@@ -80,7 +88,12 @@ project-details:
 plugins:
   - file: ViaVersion-5.2.1.jar
     source: "modrinth:viaversion/5.2.1"
+  # only present with --include-all, for plugins not found on Modrinth
+  - file: CustomPlugin.jar
+    source: "embedded"
+    data: "base64encodedjar..."
 
+# unresolved plugins, listed here instead of embedded when --include-all is not used
 unrecognised:
   - CustomPlugin.jar
 
@@ -89,6 +102,8 @@ configs:
     path: config.yml
     data: "base64encodedstring..."
 ```
+
+With `--compress`, this same YAML is written as a single entry inside a `.zip` instead of a plain `.yml` file. `/apt import` reads either format transparently.
 
 ## Installation
 

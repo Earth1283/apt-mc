@@ -13,37 +13,59 @@ import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Level
+import java.util.zip.ZipInputStream
 
 class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(plugin, packageManager) {
 
     override fun execute(sender: CommandSender, args: List<String>, dryRun: Boolean) {
-        var filename = if (args.isEmpty()) "apt-manifest.yml" else args[0]
-        if (!filename.endsWith(".yml")) filename += ".yml"
-        val file = File(plugin.dataFolder, filename)
+        val rawName = if (args.isEmpty()) "apt-manifest" else args[0]
+        val baseName = rawName.removeSuffix(".yml").removeSuffix(".zip")
+        val zipFile = File(plugin.dataFolder, "$baseName.zip")
+        val ymlFile = File(plugin.dataFolder, "$baseName.yml")
+        val file = if (zipFile.exists()) zipFile else ymlFile
 
         if (!file.exists()) {
-            sender.sendMessage(plugin.getMessage("errors.manifest-not-found", Placeholder.unparsed("arg", filename)))
+            sender.sendMessage(plugin.getMessage("errors.manifest-not-found", Placeholder.unparsed("arg", file.name)))
             return
         }
 
         if (dryRun) {
-            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Import from $filename")))
+            sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Import from " + file.name)))
             return
         }
 
         performImport(sender, file)
     }
 
+    private fun loadManifest(file: File): YamlConfiguration {
+        val yaml = YamlConfiguration()
+        if (file.name.endsWith(".zip")) {
+            ZipInputStream(file.inputStream()).use { zis ->
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    if (entry.name.endsWith(".yml")) {
+                        yaml.loadFromString(String(zis.readBytes(), Charsets.UTF_8))
+                        return yaml
+                    }
+                    entry = zis.nextEntry
+                }
+            }
+            throw IOException("No .yml manifest found inside " + file.name)
+        }
+        return YamlConfiguration.loadConfiguration(file)
+    }
+
     fun performImport(sender: CommandSender, file: File) {
         plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
             try {
                 plugin.logger.info("Starting import process for " + file.name)
-                val yaml = YamlConfiguration.loadConfiguration(file)
+                val yaml = loadManifest(file)
                 if (!yaml.contains("plugins") && !yaml.contains("configs")) {
                     plugin.logger.warning("Manifest invalid (no plugins/configs): " + file.name)
                     sender.sendMessage(plugin.getMessage("errors.invalid-manifest"))
@@ -77,7 +99,18 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                     val pluginList = yaml.getMapList("plugins")
                     for (entry in pluginList) {
                         val value = entry["source"] as? String
-                        if (value == null || !value.startsWith("modrinth:")) continue
+                        if (value == null) continue
+
+                        if (value == "embedded") {
+                            val fname = entry["file"] as? String
+                            val b64 = entry["data"] as? String
+                            if (fname != null && b64 != null) {
+                                importEmbeddedPlugin(sender, fname, b64, installedCount)
+                            }
+                            continue
+                        }
+
+                        if (!value.startsWith("modrinth:")) continue
 
                         val parts = value.substring(9).split("/")
                         if (parts.size < 2) continue
@@ -130,6 +163,23 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                 plugin.logger.log(Level.SEVERE, "Import failed unexpectedly", e)
             }
         })
+    }
+
+    private fun importEmbeddedPlugin(sender: CommandSender, filename: String, b64: String, installedCount: AtomicInteger) {
+        try {
+            if (packageManager.getInstalledPlugins().containsKey(filename)) {
+                return
+            }
+            val data = Base64.getDecoder().decode(b64)
+            val targetFile = File(packageManager.getPluginsDir(), filename)
+            FileOutputStream(targetFile).use { fos ->
+                fos.write(data)
+            }
+            sender.sendMessage(plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", filename)))
+            installedCount.incrementAndGet()
+        } catch (e: Exception) {
+            sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", filename), Placeholder.unparsed("error", e.message ?: "")))
+        }
     }
 
     private fun importOnePlugin(sender: CommandSender, projectId: String, versionNum: String, installedCount: AtomicInteger) {
