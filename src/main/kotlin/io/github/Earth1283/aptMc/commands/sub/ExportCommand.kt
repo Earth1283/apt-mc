@@ -108,13 +108,13 @@ class ExportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
             }
 
             if (!noConfigs) {
-                sendStatus(sender, plugin.getMessage("exporting-configs"))
+                sendStatus(sender, plugin.getMessage("status.exporting-configs"))
                 val configsMap = HashMap<String, MutableMap<String, String>>()
                 val pluginsDir = plugin.dataFolder.parentFile
 
                 val totalFiles = countFilesRecursive(pluginsDir)
                 val processedFiles = AtomicInteger(0)
-                val progressCallback = createProgressCallback(sender, "Exporting Configs")
+                val progressCallback = createProgressCallback(sender, "Bundling configurations", "status.config-progress")
 
                 exportConfigsRecursive(pluginsDir, pluginsDir, configsMap, processedFiles, totalFiles, progressCallback)
                 progressCallback.accept(1.0)

@@ -6,8 +6,6 @@ import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.api.ModrinthAPI
 import io.github.Earth1283.aptMc.commands.SubCommand
 import io.github.Earth1283.aptMc.managers.PackageManager
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
@@ -84,9 +82,9 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                 if (yaml.contains("unrecognised")) {
                     val unrecognised = yaml.getStringList("unrecognised")
                     if (unrecognised.isNotEmpty()) {
-                        sender.sendMessage(Component.text("The following plugins are unrecognised and must be installed manually:", NamedTextColor.YELLOW))
+                        sender.sendMessage(plugin.getMessage("status.import-unrecognised-warning"))
                         for (p in unrecognised) {
-                            sender.sendMessage(Component.text(" - $p", NamedTextColor.WHITE))
+                            sender.sendMessage(plugin.getMessage("status.import-unrecognised-item", Placeholder.unparsed("arg", p)))
                         }
                     }
                 }
@@ -129,7 +127,7 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                     downloadExecutor?.shutdown()
 
                     if (yaml.contains("configs")) {
-                        sendStatus(sender, plugin.getMessage("exporting-configs"))
+                        sendStatus(sender, plugin.getMessage("status.exporting-configs"))
                         val configs = yaml.getMapList("configs")
                         for (entry in configs) {
                             val pluginName = entry["plugin"] as? String

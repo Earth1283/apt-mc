@@ -34,7 +34,7 @@ abstract class SubCommand(
         }
     }
 
-    protected fun createProgressCallback(sender: CommandSender, filename: String): Consumer<Double> {
+    protected fun createProgressCallback(sender: CommandSender, filename: String, messageKey: String = "status.downloading"): Consumer<Double> {
         val lastUpdate = longArrayOf(0)
         val intervalMs = plugin.getConfig().getInt("console-progress-interval", 5) * 1000
 
@@ -48,14 +48,14 @@ abstract class SubCommand(
                         if (i < bars) bar.append("=") else bar.append("-")
                     }
                     bar.append("] ").append(percent).append("%")
-                    sender.sendActionBar(plugin.getMessage("status.downloading", Placeholder.unparsed("arg", "$filename $bar")))
+                    sender.sendActionBar(plugin.getMessage(messageKey, Placeholder.unparsed("arg", "$filename $bar")))
                 }
             } else {
                 val now = System.currentTimeMillis()
                 if (progress >= 1.0 || now - lastUpdate[0] >= intervalMs) {
                     lastUpdate[0] = now
                     val percent = (progress * 100).toInt()
-                    sender.sendMessage(plugin.getMessage("status.downloading", Placeholder.unparsed("arg", "$filename... $percent%")))
+                    sender.sendMessage(plugin.getMessage(messageKey, Placeholder.unparsed("arg", "$filename... $percent%")))
                 }
             }
         }
