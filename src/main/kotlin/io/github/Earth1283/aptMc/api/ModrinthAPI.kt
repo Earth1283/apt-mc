@@ -57,6 +57,26 @@ object ModrinthAPI {
 
     @JvmStatic
     @Throws(IOException::class, InterruptedException::class)
+    fun getProjects(ids: Collection<String>): JsonArray {
+        if (ids.isEmpty()) return JsonArray()
+
+        val encodedIds = URLEncoder.encode(HttpClientProvider.GSON.toJson(ids), StandardCharsets.UTF_8)
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create("$BASE_URL/projects?ids=$encodedIds"))
+            .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .GET()
+            .build()
+
+        val response = HttpClientProvider.CLIENT.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() != 200) {
+            throw IOException("API request failed with status " + response.statusCode())
+        }
+
+        return HttpClientProvider.GSON.fromJson(response.body(), JsonArray::class.java)
+    }
+
+    @JvmStatic
+    @Throws(IOException::class, InterruptedException::class)
     fun getVersions(projectId: String, loaders: List<String>): JsonArray {
         val loadersJson = HttpClientProvider.GSON.toJson(loaders)
         val encodedLoaders = URLEncoder.encode(loadersJson, StandardCharsets.UTF_8)
