@@ -8,9 +8,9 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.file.Files
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
@@ -190,10 +190,7 @@ class ExportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
             } else {
                 if (shouldExport(f)) {
                     try {
-                        val content = ByteArray(f.length().toInt())
-                        FileInputStream(f).use { fis ->
-                            fis.read(content)
-                        }
+                        val content = Files.readAllBytes(f.toPath())
                         val b64 = Base64.getEncoder().encodeToString(content)
 
                         val relPath = f.path.substring(root.path.length + 1)

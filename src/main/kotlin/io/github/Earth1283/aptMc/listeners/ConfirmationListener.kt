@@ -26,7 +26,9 @@ class ConfirmationListener(
         pending[key] = file
 
         plugin.server.scheduler.runTaskLater(plugin, Runnable {
-            if (pending.remove(key) != null) {
+            val timedOut = pending.remove(key)
+            if (timedOut != null) {
+                timedOut.delete()
                 sender.sendMessage(plugin.getMessage("errors.import-timeout"))
             }
         }, 45 * 20L)
@@ -55,8 +57,9 @@ class ConfirmationListener(
             val file = pending.remove(key)
 
             if (message.trim().equals("y", ignoreCase = true) || message.trim().equals("yes", ignoreCase = true)) {
-                commandExecutor.performImport(sender, file!!)
+                commandExecutor.performImport(sender, file!!, deleteAfter = true)
             } else {
+                file!!.delete()
                 sender.sendMessage(plugin.getMessage("errors.import-cancelled"))
             }
         }

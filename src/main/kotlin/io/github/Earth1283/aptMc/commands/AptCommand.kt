@@ -80,10 +80,10 @@ class AptCommand(private val plugin: AptMc) : CommandExecutor, TabCompleter {
         return true
     }
 
-    fun performImport(sender: CommandSender, file: File) {
+    fun performImport(sender: CommandSender, file: File, deleteAfter: Boolean = false) {
         val cmd = subCommands["import"] as? ImportCommand
         if (cmd != null) {
-            cmd.performImport(sender, file)
+            cmd.performImport(sender, file, deleteAfter)
         }
     }
 

@@ -36,11 +36,12 @@ class InstallCommand(
                 sender.sendMessage(plugin.getMessage("status.dry-run", Placeholder.unparsed("arg", "Import manifest from $url")))
                 return
             }
+            val tempDir = File(plugin.dataFolder, "temp")
+            if (!tempDir.exists()) tempDir.mkdirs()
+            val tempFile = File(tempDir, "remote_import_" + System.currentTimeMillis() + ".yml")
+            var handedOff = false
             try {
                 sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", "manifest")))
-                val tempDir = File(plugin.dataFolder, "temp")
-                if (!tempDir.exists()) tempDir.mkdirs()
-                val tempFile = File(tempDir, "remote_import_" + System.currentTimeMillis() + ".yml")
 
                 val client = HttpClient.newHttpClient()
                 val request = HttpRequest.newBuilder()
@@ -70,11 +71,14 @@ class InstallCommand(
 
                 if (confirmationListener != null) {
                     confirmationListener.addPending(sender, tempFile)
+                    handedOff = true
                 } else {
                     sender.sendMessage(plugin.getMessage("errors.listener-missing"))
                 }
             } catch (e: Exception) {
                 sender.sendMessage(plugin.getMessage("errors.fetch-manifest-failed", Placeholder.unparsed("error", e.message ?: "")))
+            } finally {
+                if (!handedOff) tempFile.delete()
             }
             return
         }

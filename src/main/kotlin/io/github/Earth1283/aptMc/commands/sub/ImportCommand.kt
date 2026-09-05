@@ -69,7 +69,7 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
         return YamlConfiguration.loadConfiguration(file)
     }
 
-    fun performImport(sender: CommandSender, file: File) {
+    fun performImport(sender: CommandSender, file: File, deleteAfter: Boolean = false) {
         plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
             try {
                 plugin.logger.info("Starting import process for " + file.name)
@@ -77,6 +77,7 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                 if (!yaml.contains("plugins") && !yaml.contains("configs")) {
                     plugin.logger.warning("Manifest invalid (no plugins/configs): " + file.name)
                     sender.sendMessage(plugin.getMessage("errors.invalid-manifest"))
+                    if (deleteAfter) file.delete()
                     return@Runnable
                 }
 
@@ -169,10 +170,13 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                     } else {
                         sender.sendMessage(plugin.getMessage("status.import-empty"))
                     }
+
+                    if (deleteAfter) file.delete()
                 }
             } catch (e: Exception) {
                 sender.sendMessage(plugin.getMessage("errors.execution-error", Placeholder.unparsed("arg", e.message ?: "")))
                 plugin.logger.log(Level.SEVERE, "Import failed unexpectedly", e)
+                if (deleteAfter) file.delete()
             }
         })
     }
