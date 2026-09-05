@@ -17,9 +17,13 @@ import java.util.logging.Level
 
 class AptMc : JavaPlugin() {
 
+    @Volatile
+    private lateinit var messages: FileConfiguration
+
     override fun onEnable() {
         updateConfig("config.yml")
         updateConfig("messages.yml")
+        reloadMessages()
 
         val aptCommand = AptCommand(this)
         val confirmationListener = ConfirmationListener(this, aptCommand)
@@ -36,10 +40,12 @@ class AptMc : JavaPlugin() {
     }
 
     fun getMessage(key: String, vararg placeholders: TagResolver): Component {
-        val messagesFile = File(dataFolder, "messages.yml")
-        val messages = YamlConfiguration.loadConfiguration(messagesFile)
         val raw = messages.getString(key) ?: return Component.text("Missing message: $key")
         return MiniMessage.miniMessage().deserialize(raw, *placeholders)
+    }
+
+    fun reloadMessages() {
+        messages = YamlConfiguration.loadConfiguration(File(dataFolder, "messages.yml"))
     }
 
     private fun updateConfig(fileName: String) {

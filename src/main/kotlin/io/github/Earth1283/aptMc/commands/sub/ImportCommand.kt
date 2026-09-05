@@ -21,6 +21,16 @@ import java.util.zip.ZipInputStream
 
 class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(plugin, packageManager) {
 
+    /**
+     * Resolves [child] under [root], rejecting any path that escapes [root]
+     * (via "..", an absolute path, or a symlink) after normalization.
+     */
+    private fun resolveSafe(root: File, child: String): File? {
+        val rootCanonical = root.canonicalFile
+        val target = File(root, child).canonicalFile
+        return if (target == rootCanonical || target.toPath().startsWith(rootCanonical.toPath())) target else null
+    }
+
     override fun execute(sender: CommandSender, args: List<String>, dryRun: Boolean) {
         val rawName = if (args.isEmpty()) "apt-manifest" else args[0]
         val baseName = rawName.removeSuffix(".yml").removeSuffix(".zip")
@@ -136,8 +146,12 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
 
                             if (pluginName != null && subPath != null && b64 != null) {
                                 try {
+                                    val targetFile = resolveSafe(plugin.dataFolder.parentFile, pluginName + File.separator + subPath)
+                                    if (targetFile == null) {
+                                        sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", "Config $pluginName/$subPath"), Placeholder.unparsed("error", "Unsafe path in manifest")))
+                                        continue
+                                    }
                                     val data = Base64.getDecoder().decode(b64)
-                                    val targetFile = File(plugin.dataFolder.parentFile, pluginName + File.separator + subPath)
                                     if (!targetFile.parentFile.exists()) targetFile.parentFile.mkdirs()
 
                                     FileOutputStream(targetFile).use { fos ->
@@ -168,8 +182,12 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
             if (packageManager.getInstalledPlugins().containsKey(filename)) {
                 return
             }
+            val targetFile = resolveSafe(packageManager.getPluginsDir(), filename)
+            if (targetFile == null) {
+                sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", filename), Placeholder.unparsed("error", "Unsafe path in manifest")))
+                return
+            }
             val data = Base64.getDecoder().decode(b64)
-            val targetFile = File(packageManager.getPluginsDir(), filename)
             FileOutputStream(targetFile).use { fos ->
                 fos.write(data)
             }
