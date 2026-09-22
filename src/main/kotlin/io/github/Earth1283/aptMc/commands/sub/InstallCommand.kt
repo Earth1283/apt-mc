@@ -4,16 +4,17 @@ import com.google.gson.JsonObject
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.api.GitHubAPI
 import io.github.Earth1283.aptMc.api.HangarAPI
+import io.github.Earth1283.aptMc.api.HttpClientProvider
 import io.github.Earth1283.aptMc.api.ModrinthAPI
 import io.github.Earth1283.aptMc.commands.SubCommand
 import io.github.Earth1283.aptMc.listeners.ConfirmationListener
+import io.github.Earth1283.aptMc.managers.AsyncExecutor
 import io.github.Earth1283.aptMc.managers.PackageManager
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
 import java.net.URI
-import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.util.concurrent.CompletableFuture
@@ -43,14 +44,14 @@ class InstallCommand(
             try {
                 sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", "manifest")))
 
-                val client = HttpClient.newHttpClient()
                 val request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("User-Agent", "apt-mc/1.2 (parody-cli)")
+                    .header("User-Agent", HttpClientProvider.USER_AGENT)
+                    .timeout(HttpClientProvider.DOWNLOAD_TIMEOUT)
                     .GET()
                     .build()
 
-                val response = client.send(request, HttpResponse.BodyHandlers.ofFile(tempFile.toPath()))
+                val response = HttpClientProvider.CLIENT.send(request, HttpResponse.BodyHandlers.ofFile(tempFile.toPath()))
 
                 if (response.statusCode() != 200) {
                     sender.sendMessage(plugin.getMessage("errors.fetch-manifest-failed", Placeholder.unparsed("error", "HTTP " + response.statusCode())))
@@ -176,7 +177,7 @@ class InstallCommand(
         sender.sendMessage(plugin.getMessage("status.install-summary", Placeholder.unparsed("arg", toInstall.size.toString())))
 
         val installFutures = toInstall.map { pkg ->
-            CompletableFuture.runAsync {
+            CompletableFuture.runAsync(Runnable {
                 val source = if (pkg.has("source")) pkg.get("source").asString else "modrinth"
 
                 if (source == "github") {
@@ -191,7 +192,7 @@ class InstallCommand(
                     } catch (e: Exception) {
                         sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", pkg.get("slug").asString), Placeholder.unparsed("error", e.message ?: "")))
                     }
-                    return@runAsync
+                    return@Runnable
                 }
 
                 if (source == "hangar") {
@@ -201,7 +202,7 @@ class InstallCommand(
 
                         if (url == null || filename == null) {
                             sender.sendMessage(plugin.getMessage("errors.hangar-resolve-failed", Placeholder.unparsed("arg", pkg.get("hangar_slug").asString)))
-                            return@runAsync
+                            return@Runnable
                         }
 
                         sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", filename)))
@@ -210,7 +211,7 @@ class InstallCommand(
                     } catch (e: Exception) {
                         sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", "Hangar Package"), Placeholder.unparsed("error", e.message ?: "")))
                     }
-                    return@runAsync
+                    return@Runnable
                 }
 
                 val slug = pkg.get("slug").asString
@@ -218,7 +219,7 @@ class InstallCommand(
                     val versions = ModrinthAPI.getVersions(pkg.get("id").asString, listOf("spigot", "paper", "purpur", "bukkit"))
                     if (versions.size() == 0) {
                         sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", slug), Placeholder.unparsed("error", "No compatible versions")))
-                        return@runAsync
+                        return@Runnable
                     }
 
                     val latest = versions[0].asJsonObject
@@ -235,14 +236,15 @@ class InstallCommand(
                     val url = primaryFile.get("url").asString
                     val filename = primaryFile.get("filename").asString
                     val size = primaryFile.get("size").asLong
+                    val sha1 = ModrinthAPI.getSha1(primaryFile)
 
                     sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", filename)))
-                    packageManager.downloadFile(url, packageManager.getPluginsDir(), filename, size, createProgressCallback(sender, filename))
+                    packageManager.downloadFile(url, packageManager.getPluginsDir(), filename, size, createProgressCallback(sender, filename), sha1)
                     sendStatus(sender, plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", filename)))
                 } catch (e: Exception) {
                     sender.sendMessage(plugin.getMessage("errors.install-failed", Placeholder.unparsed("arg", slug), Placeholder.unparsed("error", e.message ?: "")))
                 }
-            }
+            }, AsyncExecutor.POOL)
         }
 
         CompletableFuture.allOf(*installFutures.toTypedArray()).join()

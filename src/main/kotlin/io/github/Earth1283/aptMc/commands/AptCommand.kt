@@ -7,6 +7,7 @@ import io.github.Earth1283.aptMc.commands.sub.ImportCommand
 import io.github.Earth1283.aptMc.commands.sub.InfoCommand
 import io.github.Earth1283.aptMc.commands.sub.InstallCommand
 import io.github.Earth1283.aptMc.commands.sub.ListCommand
+import io.github.Earth1283.aptMc.commands.sub.PinCommand
 import io.github.Earth1283.aptMc.commands.sub.RemoveCommand
 import io.github.Earth1283.aptMc.commands.sub.SearchCommand
 import io.github.Earth1283.aptMc.commands.sub.UpdateCommand
@@ -45,6 +46,7 @@ class AptCommand(private val plugin: AptMc) : CommandExecutor, TabCompleter {
         subCommands["remove"] = RemoveCommand(plugin, packageManager)
         subCommands["export"] = ExportCommand(plugin, packageManager)
         subCommands["import"] = ImportCommand(plugin, packageManager)
+        subCommands["pin"] = PinCommand(plugin, packageManager)
         val compile = CompileCommand(plugin, packageManager)
         compileCommand = compile
         subCommands["compile"] = compile
@@ -106,6 +108,7 @@ class AptCommand(private val plugin: AptMc) : CommandExecutor, TabCompleter {
         sender.sendMessage(plugin.getMessage("usage.export"))
         sender.sendMessage(plugin.getMessage("usage.import"))
         sender.sendMessage(plugin.getMessage("usage.compile"))
+        sender.sendMessage(plugin.getMessage("usage.pin"))
     }
 
     override fun onTabComplete(sender: CommandSender, command: Command, alias: String, args: Array<out String>): List<String> {

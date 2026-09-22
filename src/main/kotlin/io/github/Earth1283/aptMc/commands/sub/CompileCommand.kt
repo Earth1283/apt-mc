@@ -66,13 +66,30 @@ class CompileCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand
         if (!cacheRoot.exists()) cacheRoot.mkdirs()
 
         val repoName = GitOperations.extractRepoName(gitUrl)
-        val repoDir = File(cacheRoot, repoName + "_" + System.currentTimeMillis())
+        // Stable per (url, branch) directory name so repeat compiles reuse the clone instead
+        // of cloning from scratch every time.
+        val repoKey = Integer.toHexString((gitUrl + "#" + branch).hashCode())
+        val repoDir = File(cacheRoot, repoName + "_" + repoKey)
 
         try {
-            sendStatus(sender, plugin.getMessage("status.compile-cloning", Placeholder.unparsed("arg", gitUrl)))
             val timeout = plugin.getConfig().getInt("compile.clone-timeout", 300)
             val depth = plugin.getConfig().getInt("compile.clone-depth", 1)
-            GitOperations.cloneRepository(gitUrl, branch, repoDir, timeout, depth)
+
+            if (GitOperations.isGitRepository(repoDir)) {
+                try {
+                    sendStatus(sender, plugin.getMessage("status.compile-updating", Placeholder.unparsed("arg", gitUrl)))
+                    GitOperations.updateRepository(repoDir, branch, timeout)
+                } catch (e: Exception) {
+                    plugin.logger.log(Level.WARNING, "Failed to update cached repo for $gitUrl, falling back to fresh clone", e)
+                    deleteRecursively(repoDir)
+                    sendStatus(sender, plugin.getMessage("status.compile-cloning", Placeholder.unparsed("arg", gitUrl)))
+                    GitOperations.cloneRepository(gitUrl, branch, repoDir, timeout, depth)
+                }
+            } else {
+                if (repoDir.exists()) deleteRecursively(repoDir)
+                sendStatus(sender, plugin.getMessage("status.compile-cloning", Placeholder.unparsed("arg", gitUrl)))
+                GitOperations.cloneRepository(gitUrl, branch, repoDir, timeout, depth)
+            }
             sendStatus(sender, plugin.getMessage("status.compile-cloned"))
 
             sendStatus(sender, plugin.getMessage("status.compile-detecting"))

@@ -20,6 +20,7 @@ object HangarAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .GET()
             .build()
 
@@ -38,6 +39,7 @@ object HangarAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .GET()
             .build()
 
@@ -61,6 +63,7 @@ object HangarAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .GET()
             .build()
 

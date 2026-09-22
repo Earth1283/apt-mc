@@ -5,6 +5,7 @@ import com.google.gson.JsonObject
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.api.ModrinthAPI
 import io.github.Earth1283.aptMc.commands.SubCommand
+import io.github.Earth1283.aptMc.managers.AsyncExecutor
 import io.github.Earth1283.aptMc.managers.PackageManager
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import org.bukkit.command.CommandSender
@@ -14,7 +15,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.Base64
 import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.logging.Level
 import java.util.zip.ZipInputStream
@@ -102,7 +102,6 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
 
                 val futures = ArrayList<CompletableFuture<Void>>()
                 val installedCount = AtomicInteger(0)
-                val downloadExecutor = if (yaml.contains("plugins")) Executors.newFixedThreadPool(3) else null
 
                 if (yaml.contains("plugins")) {
                     val pluginList = yaml.getMapList("plugins")
@@ -129,14 +128,12 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
 
                         futures.add(CompletableFuture.runAsync({
                             importOnePlugin(sender, projectId, versionNum, installedCount)
-                        }, downloadExecutor!!))
+                        }, AsyncExecutor.POOL))
                     }
                     sender.sendMessage(plugin.getMessage("status.importing-count", Placeholder.unparsed("arg", futures.size.toString())))
                 }
 
                 CompletableFuture.allOf(*futures.toTypedArray()).thenRun {
-                    downloadExecutor?.shutdown()
-
                     if (yaml.contains("configs")) {
                         sendStatus(sender, plugin.getMessage("status.exporting-configs"))
                         val configs = yaml.getMapList("configs")
@@ -165,6 +162,10 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                         }
                     }
 
+                    if (yaml.contains("pinned")) {
+                        applyPinnedVersions(sender, yaml.getMapList("pinned"))
+                    }
+
                     if (installedCount.get() > 0 || yaml.contains("configs")) {
                         sender.sendMessage(plugin.getMessage("status.import-complete"))
                     } else {
@@ -179,6 +180,38 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                 if (deleteAfter) file.delete()
             }
         })
+    }
+
+    /**
+     * Re-applies pins from the manifest's "pinned" section, run after all plugin installs
+     * have finished so freshly-installed jars can be resolved back to a filename.
+     */
+    private fun applyPinnedVersions(sender: CommandSender, pinnedList: List<Map<*, *>>) {
+        if (pinnedList.isEmpty()) return
+
+        sendStatus(sender, plugin.getMessage("status.import-pinning"))
+
+        val projectToFilename = HashMap<String, String>()
+        try {
+            val installedNow = packageManager.getInstalledPlugins()
+            val versionsNow = resolveVersions(ArrayList(installedNow.values))
+            for ((filename, sha1) in installedNow) {
+                val v = versionsNow[sha1] ?: continue
+                projectToFilename[v.get("project_id").asString] = filename
+            }
+        } catch (e: Exception) {
+            plugin.logger.log(Level.WARNING, "Failed to resolve installed versions while re-applying pins", e)
+        }
+
+        for (entry in pinnedList) {
+            val projectId = entry["project_id"] as? String ?: continue
+            val versionNumber = entry["version_number"] as? String ?: "unknown"
+
+            val info = JsonObject()
+            info.addProperty("filename", projectToFilename[projectId] ?: projectId)
+            info.addProperty("version_number", versionNumber)
+            packageManager.pin(projectId, info)
+        }
     }
 
     private fun importEmbeddedPlugin(sender: CommandSender, filename: String, b64: String, installedCount: AtomicInteger) {
@@ -245,7 +278,7 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
             }
 
             sendStatus(sender, plugin.getMessage("status.downloading", Placeholder.unparsed("arg", fname)))
-            packageManager.downloadFile(url, packageManager.getPluginsDir(), fname, size, createProgressCallback(sender, fname))
+            packageManager.downloadFile(url, packageManager.getPluginsDir(), fname, size, createProgressCallback(sender, fname), sha1)
             sendStatus(sender, plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", fname)))
             installedCount.incrementAndGet()
         } catch (e: Exception) {

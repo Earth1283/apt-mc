@@ -84,9 +84,10 @@ class UpdateCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                     val url = primaryFile.get("url").asString
                     val filename = primaryFile.get("filename").asString
                     val size = primaryFile.get("size").asLong
+                    val sha1 = ModrinthAPI.getSha1(primaryFile)
 
                     sendStatus(sender, plugin.getMessage("status.self-update-downloading"))
-                    packageManager.downloadFile(url, packageManager.getUpdateDir(), filename, size, createProgressCallback(sender, filename))
+                    packageManager.downloadFile(url, packageManager.getUpdateDir(), filename, size, createProgressCallback(sender, filename), sha1)
                     sendStatus(sender, plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", "Update")))
                     return
                 } catch (e: Exception) {

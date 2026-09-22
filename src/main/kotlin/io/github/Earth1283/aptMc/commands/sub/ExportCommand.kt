@@ -69,6 +69,7 @@ class ExportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
             yaml.set("project-details.created", System.currentTimeMillis())
 
             val pluginList = ArrayList<Map<String, String>>()
+            val pinnedList = ArrayList<Map<String, String>>()
             val unrecognisedList = ArrayList<String>()
             var count = 0
 
@@ -83,6 +84,13 @@ class ExportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                     entryMap["source"] = "modrinth:$projectId/$verNum"
                     pluginList.add(entryMap)
                     count++
+
+                    if (packageManager.isPinned(projectId)) {
+                        val pinMap = LinkedHashMap<String, String>()
+                        pinMap["project_id"] = projectId
+                        pinMap["version_number"] = verNum
+                        pinnedList.add(pinMap)
+                    }
                 } else if (includeAll) {
                     try {
                         val jarFile = File(packageManager.getPluginsDir(), pluginFilename)
@@ -106,17 +114,23 @@ class ExportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
             if (unrecognisedList.isNotEmpty()) {
                 yaml.set("unrecognised", unrecognisedList)
             }
+            if (pinnedList.isNotEmpty()) {
+                yaml.set("pinned", pinnedList)
+            }
 
             if (!noConfigs) {
                 sendStatus(sender, plugin.getMessage("status.exporting-configs"))
                 val configsMap = HashMap<String, MutableMap<String, String>>()
                 val pluginsDir = plugin.dataFolder.parentFile
 
-                val totalFiles = countFilesRecursive(pluginsDir)
+                val filesToExport = ArrayList<File>()
+                collectExportableFiles(pluginsDir, filesToExport)
+
+                val totalFiles = filesToExport.size
                 val processedFiles = AtomicInteger(0)
                 val progressCallback = createProgressCallback(sender, "Bundling configurations", "status.config-progress")
 
-                exportConfigsRecursive(pluginsDir, pluginsDir, configsMap, processedFiles, totalFiles, progressCallback)
+                exportConfigs(pluginsDir, filesToExport, configsMap, processedFiles, totalFiles, progressCallback)
                 progressCallback.accept(1.0)
 
                 val configExportList = ArrayList<Map<String, String>>()
@@ -156,60 +170,48 @@ class ExportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
         })
     }
 
-    private fun countFilesRecursive(dir: File): Int {
-        var count = 0
-        val files = dir.listFiles() ?: return 0
-
-        for (f in files) {
-            if (f.isDirectory) {
-                if (f == plugin.dataFolder) continue
-                count += countFilesRecursive(f)
-            } else {
-                if (shouldExport(f)) {
-                    count++
-                }
-            }
-        }
-        return count
-    }
-
-    private fun exportConfigsRecursive(
-        dir: File,
-        root: File,
-        configs: MutableMap<String, MutableMap<String, String>>,
-        processed: AtomicInteger,
-        total: Int,
-        callback: Consumer<Double>
-    ) {
+    /** Walks the server directory tree once, collecting every file eligible for export. */
+    private fun collectExportableFiles(dir: File, out: MutableList<File>) {
         val files = dir.listFiles() ?: return
 
         for (f in files) {
             if (f.isDirectory) {
                 if (f == plugin.dataFolder) continue
-                exportConfigsRecursive(f, root, configs, processed, total, callback)
-            } else {
-                if (shouldExport(f)) {
-                    try {
-                        val content = Files.readAllBytes(f.toPath())
-                        val b64 = Base64.getEncoder().encodeToString(content)
+                collectExportableFiles(f, out)
+            } else if (shouldExport(f)) {
+                out.add(f)
+            }
+        }
+    }
 
-                        val relPath = f.path.substring(root.path.length + 1)
-                        val firstSlash = relPath.indexOf(File.separatorChar)
-                        if (firstSlash != -1) {
-                            val pluginName = relPath.substring(0, firstSlash)
-                            val subPath = relPath.substring(firstSlash + 1)
+    private fun exportConfigs(
+        root: File,
+        files: List<File>,
+        configs: MutableMap<String, MutableMap<String, String>>,
+        processed: AtomicInteger,
+        total: Int,
+        callback: Consumer<Double>
+    ) {
+        for (f in files) {
+            try {
+                val content = Files.readAllBytes(f.toPath())
+                val b64 = Base64.getEncoder().encodeToString(content)
 
-                            configs.computeIfAbsent(pluginName) { HashMap() }[subPath] = b64
-                        }
-                    } catch (e: Exception) {
-                        plugin.logger.warning("Failed to export config: " + f.name)
-                    }
+                val relPath = f.path.substring(root.path.length + 1)
+                val firstSlash = relPath.indexOf(File.separatorChar)
+                if (firstSlash != -1) {
+                    val pluginName = relPath.substring(0, firstSlash)
+                    val subPath = relPath.substring(firstSlash + 1)
 
-                    val p = processed.incrementAndGet()
-                    if (total > 0 && p % 5 == 0) {
-                        callback.accept(p.toDouble() / total)
-                    }
+                    configs.computeIfAbsent(pluginName) { HashMap() }[subPath] = b64
                 }
+            } catch (e: Exception) {
+                plugin.logger.warning("Failed to export config: " + f.name)
+            }
+
+            val p = processed.incrementAndGet()
+            if (total > 0 && p % 5 == 0) {
+                callback.accept(p.toDouble() / total)
             }
         }
     }

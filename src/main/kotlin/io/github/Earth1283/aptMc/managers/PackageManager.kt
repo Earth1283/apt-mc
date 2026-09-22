@@ -15,6 +15,7 @@ import java.net.URI
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.function.Consumer
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -27,8 +28,18 @@ class PackageManager(
     private val cacheFile: File = File(dataFolder, "cache.json")
     private var cache: MutableMap<String, JsonObject> = HashMap()
 
+    private val fileHashCacheFile: File = File(dataFolder, "filehashes.json")
+    private var fileHashCache: MutableMap<String, FileHashEntry> = ConcurrentHashMap()
+
+    private val pinnedFile: File = File(dataFolder, "pinned.json")
+    private var pinned: MutableMap<String, JsonObject> = ConcurrentHashMap()
+
+    private data class FileHashEntry(val size: Long, val lastModified: Long, val sha1: String)
+
     init {
         loadCache()
+        loadFileHashCache()
+        loadPinned()
     }
 
     private fun loadCache() {
@@ -72,6 +83,75 @@ class PackageManager(
         saveCache()
     }
 
+    private fun loadFileHashCache() {
+        if (fileHashCacheFile.exists()) {
+            try {
+                FileReader(fileHashCacheFile).use { reader ->
+                    val type = object : TypeToken<Map<String, FileHashEntry>>() {}.type
+                    val loaded: MutableMap<String, FileHashEntry>? = HttpClientProvider.GSON.fromJson(reader, type)
+                    if (loaded != null) {
+                        this.fileHashCache = ConcurrentHashMap(loaded)
+                    }
+                }
+            } catch (e: IOException) {
+                logger.log(Level.WARNING, "Failed to load file hash cache", e)
+            }
+        }
+    }
+
+    private fun saveFileHashCache() {
+        if (!dataFolder.exists()) dataFolder.mkdirs()
+        try {
+            FileWriter(fileHashCacheFile).use { writer ->
+                HttpClientProvider.GSON.toJson(fileHashCache, writer)
+            }
+        } catch (e: IOException) {
+            logger.log(Level.WARNING, "Failed to save file hash cache", e)
+        }
+    }
+
+    private fun loadPinned() {
+        if (pinnedFile.exists()) {
+            try {
+                FileReader(pinnedFile).use { reader ->
+                    val type = object : TypeToken<Map<String, JsonObject>>() {}.type
+                    val loaded: MutableMap<String, JsonObject>? = HttpClientProvider.GSON.fromJson(reader, type)
+                    if (loaded != null) {
+                        this.pinned = ConcurrentHashMap(loaded)
+                    }
+                }
+            } catch (e: IOException) {
+                logger.log(Level.WARNING, "Failed to load pinned packages", e)
+            }
+        }
+    }
+
+    private fun savePinned() {
+        if (!dataFolder.exists()) dataFolder.mkdirs()
+        try {
+            FileWriter(pinnedFile).use { writer ->
+                HttpClientProvider.GSON.toJson(pinned, writer)
+            }
+        } catch (e: IOException) {
+            logger.log(Level.WARNING, "Failed to save pinned packages", e)
+        }
+    }
+
+    fun isPinned(projectId: String): Boolean = pinned.containsKey(projectId)
+
+    fun pin(projectId: String, info: JsonObject) {
+        pinned[projectId] = info
+        savePinned()
+    }
+
+    fun unpin(projectId: String): Boolean {
+        val removed = pinned.remove(projectId) != null
+        if (removed) savePinned()
+        return removed
+    }
+
+    fun getPinned(): Map<String, JsonObject> = pinned
+
     fun ensureDir() {
         if (!pluginsDir.exists()) {
             pluginsDir.mkdirs()
@@ -87,13 +167,14 @@ class PackageManager(
     }
 
     @Throws(IOException::class, InterruptedException::class)
-    fun downloadFile(url: String, destDir: File, filename: String, size: Long, progressCallback: Consumer<Double>?) {
+    fun downloadFile(url: String, destDir: File, filename: String, size: Long, progressCallback: Consumer<Double>?, expectedSha1: String? = null) {
         if (!destDir.exists()) destDir.mkdirs()
         val destPath = File(destDir, filename)
 
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.DOWNLOAD_TIMEOUT)
             .GET()
             .build()
 
@@ -114,6 +195,14 @@ class PackageManager(
                         progressCallback.accept(totalRead.toDouble() / size)
                     }
                 }
+            }
+        }
+
+        if (expectedSha1 != null) {
+            val actual = calculateSha1(destPath)
+            if (!actual.equals(expectedSha1, ignoreCase = true)) {
+                destPath.delete()
+                throw IOException("Downloaded file hash mismatch for $filename (expected $expectedSha1, got $actual)")
             }
         }
     }
@@ -142,21 +231,38 @@ class PackageManager(
         }
     }
 
+    /**
+     * Returns filename -> sha1 for every installed plugin jar. Hashes are cached by
+     * (filename, size, lastModified) and persisted to disk so unchanged jars are not
+     * re-hashed on every call.
+     */
     fun getInstalledPlugins(): Map<String, String> {
         val plugins: MutableMap<String, String> = HashMap()
         if (!pluginsDir.exists()) return plugins
 
         val files = pluginsDir.listFiles() ?: return plugins
+        var cacheChanged = false
 
         for (f in files) {
             if (f.isFile && f.name.lowercase().endsWith(".jar")) {
                 try {
-                    plugins[f.name] = calculateSha1(f)
+                    val cached = fileHashCache[f.name]
+                    val sha1 = if (cached != null && cached.size == f.length() && cached.lastModified == f.lastModified()) {
+                        cached.sha1
+                    } else {
+                        val computed = calculateSha1(f)
+                        fileHashCache[f.name] = FileHashEntry(f.length(), f.lastModified(), computed)
+                        cacheChanged = true
+                        computed
+                    }
+                    plugins[f.name] = sha1
                 } catch (e: IOException) {
                     logger.log(Level.WARNING, "Could not read plugin file: " + f.name, e)
                 }
             }
         }
+
+        if (cacheChanged) saveFileHashCache()
         return plugins
     }
 

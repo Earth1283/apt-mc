@@ -24,6 +24,7 @@ object ModrinthAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .GET()
             .build()
 
@@ -43,6 +44,7 @@ object ModrinthAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .GET()
             .build()
 
@@ -64,6 +66,7 @@ object ModrinthAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$BASE_URL/projects?ids=$encodedIds"))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .GET()
             .build()
 
@@ -85,6 +88,7 @@ object ModrinthAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .GET()
             .build()
 
@@ -110,6 +114,7 @@ object ModrinthAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(BASE_URL + "/version_files"))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(HttpClientProvider.GSON.toJson(body)))
             .build()
@@ -129,6 +134,7 @@ object ModrinthAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .GET()
             .build()
 
@@ -138,5 +144,14 @@ object ModrinthAPI {
         }
 
         return HttpClientProvider.GSON.fromJson(response.body(), JsonArray::class.java)
+    }
+
+    /** Extracts the sha1 hash from a Modrinth version-file JSON object, or null if absent. */
+    @JvmStatic
+    fun getSha1(fileObj: JsonObject): String? {
+        if (!fileObj.has("hashes")) return null
+        val hashes = fileObj.getAsJsonObject("hashes")
+        if (!hashes.has("sha1") || hashes.get("sha1").isJsonNull) return null
+        return hashes.get("sha1").asString
     }
 }

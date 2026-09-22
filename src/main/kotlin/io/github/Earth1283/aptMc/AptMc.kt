@@ -3,6 +3,7 @@ package io.github.Earth1283.aptMc
 import io.github.Earth1283.aptMc.commands.AptCommand
 import io.github.Earth1283.aptMc.listeners.CompileInputListener
 import io.github.Earth1283.aptMc.listeners.ConfirmationListener
+import io.github.Earth1283.aptMc.managers.AsyncExecutor
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.minimessage.MiniMessage
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver
@@ -37,6 +38,7 @@ class AptMc : JavaPlugin() {
     }
 
     override fun onDisable() {
+        AsyncExecutor.shutdown()
     }
 
     fun getMessage(key: String, vararg placeholders: TagResolver): Component {

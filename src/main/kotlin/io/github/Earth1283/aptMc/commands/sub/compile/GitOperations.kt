@@ -1,8 +1,10 @@
 package io.github.Earth1283.aptMc.commands.sub.compile
 
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.api.ResetCommand
 import org.eclipse.jgit.api.errors.GitAPIException
 import java.io.File
+import java.io.IOException
 
 object GitOperations {
 
@@ -52,5 +54,34 @@ object GitOperations {
             .setCloneAllBranches(false)
             .call()
             .close()
+    }
+
+    /** True if [dir] already holds a git working copy (used to reuse a cached clone). */
+    @JvmStatic
+    fun isGitRepository(dir: File): Boolean {
+        return File(dir, ".git").isDirectory
+    }
+
+    /**
+     * Updates an existing cached clone in place: fetches [branch] from origin, hard-resets
+     * to it, and discards any leftover build output/untracked files - much cheaper than a
+     * fresh clone for repeat compiles of the same repo/branch.
+     */
+    @JvmStatic
+    @Throws(GitAPIException::class, IOException::class)
+    fun updateRepository(repoDir: File, branch: String, timeout: Int) {
+        Git.open(repoDir).use { git ->
+            git.fetch()
+                .setTimeout(if (timeout > 0) timeout else 0)
+                .call()
+            git.reset()
+                .setMode(ResetCommand.ResetType.HARD)
+                .setRef("origin/$branch")
+                .call()
+            git.clean()
+                .setForce(true)
+                .setCleanDirectories(true)
+                .call()
+        }
     }
 }

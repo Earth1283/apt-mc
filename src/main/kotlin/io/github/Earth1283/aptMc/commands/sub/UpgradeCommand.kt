@@ -4,6 +4,7 @@ import com.google.gson.JsonObject
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.api.ModrinthAPI
 import io.github.Earth1283.aptMc.commands.SubCommand
+import io.github.Earth1283.aptMc.managers.AsyncExecutor
 import io.github.Earth1283.aptMc.managers.PackageManager
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder
 import org.bukkit.command.CommandSender
@@ -38,6 +39,7 @@ class UpgradeCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand
             val updates: MutableList<UpgradeInfo> = Collections.synchronizedList(ArrayList())
 
             val checkFutures = ArrayList<CompletableFuture<Void>>()
+            var heldBack = 0
 
             for ((filename, sha1) in installed) {
                 val currentVersionInfo = versionsMap[sha1]
@@ -45,7 +47,12 @@ class UpgradeCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand
                     val projectId = currentVersionInfo.get("project_id").asString
                     val currentVerId = currentVersionInfo.get("id").asString
 
-                    checkFutures.add(CompletableFuture.runAsync {
+                    if (packageManager.isPinned(projectId)) {
+                        heldBack++
+                        continue
+                    }
+
+                    checkFutures.add(CompletableFuture.runAsync({
                         try {
                             val availableVersions = ModrinthAPI.getVersions(projectId, listOf("spigot", "paper", "purpur", "bukkit"))
                             if (availableVersions.size() > 0) {
@@ -56,7 +63,7 @@ class UpgradeCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand
                             }
                         } catch (ignored: Exception) {
                         }
-                    })
+                    }, AsyncExecutor.POOL))
                 }
             }
 
@@ -65,7 +72,7 @@ class UpgradeCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand
             sender.sendMessage(plugin.getMessage("status.done"))
 
             if (updates.isEmpty()) {
-                sender.sendMessage(plugin.getMessage("status.upgrade-summary-empty"))
+                sender.sendMessage(plugin.getMessage("status.upgrade-summary-empty", Placeholder.unparsed("arg", heldBack.toString())))
                 return
             }
 
@@ -83,13 +90,13 @@ class UpgradeCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand
                 sender.sendMessage(plugin.getMessage("status.upgrade-list-item", Placeholder.unparsed("arg1", up.filename), Placeholder.unparsed("arg2", up.currentVersion), Placeholder.unparsed("arg3", up.newVersion)))
             }
 
-            sender.sendMessage(plugin.getMessage("status.upgrade-summary", Placeholder.unparsed("arg", updates.size.toString())))
+            sender.sendMessage(plugin.getMessage("status.upgrade-summary", Placeholder.unparsed("arg1", updates.size.toString()), Placeholder.unparsed("arg2", heldBack.toString())))
             sender.sendMessage(plugin.getMessage("status.upgrading"))
 
             val upgradeFutures = updates.map { up ->
-                CompletableFuture.runAsync {
+                CompletableFuture.runAsync(Runnable {
                     val files = up.latestObj.getAsJsonArray("files")
-                    if (files.size() == 0) return@runAsync
+                    if (files.size() == 0) return@Runnable
 
                     var primaryFile = files[0].asJsonObject
                     for (f in files) {
@@ -100,12 +107,13 @@ class UpgradeCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand
                     }
 
                     try {
-                        packageManager.downloadFile(primaryFile.get("url").asString, packageManager.getUpdateDir(), primaryFile.get("filename").asString, primaryFile.get("size").asLong, createProgressCallback(sender, up.filename))
+                        val sha1 = ModrinthAPI.getSha1(primaryFile)
+                        packageManager.downloadFile(primaryFile.get("url").asString, packageManager.getUpdateDir(), primaryFile.get("filename").asString, primaryFile.get("size").asLong, createProgressCallback(sender, up.filename), sha1)
                         sendStatus(sender, plugin.getMessage("status.upgraded", Placeholder.unparsed("arg", up.filename)))
                     } catch (e: Exception) {
                         sender.sendMessage(plugin.getMessage("errors.upgrade-failed", Placeholder.unparsed("arg", up.filename), Placeholder.unparsed("error", e.message ?: "")))
                     }
-                }
+                }, AsyncExecutor.POOL)
             }
 
             CompletableFuture.allOf(*upgradeFutures.toTypedArray()).join()

@@ -16,6 +16,7 @@ object GitHubAPI {
         val request = HttpRequest.newBuilder()
             .uri(URI.create(url))
             .header("User-Agent", HttpClientProvider.USER_AGENT)
+            .timeout(HttpClientProvider.API_TIMEOUT)
             .header("Accept", "application/vnd.github.v3+json")
             .GET()
             .build()

@@ -60,16 +60,17 @@ object BuildRunner {
                     "org.gradle.wrapper.GradleWrapperMain",
                     task,
                     "--console=plain",
-                    "--no-daemon"
+                    "--no-daemon",
+                    "--build-cache"
                 )
             } else {
                 var gradlew = File(repoDir, "gradlew")
                 if (!gradlew.exists()) gradlew = File(repoDir, "gradlew.bat")
                 pb = if (gradlew.exists()) {
                     gradlew.setExecutable(true)
-                    ProcessBuilder(gradlew.absolutePath, task, "--console=plain", "--no-daemon")
+                    ProcessBuilder(gradlew.absolutePath, task, "--console=plain", "--no-daemon", "--build-cache")
                 } else {
-                    ProcessBuilder("gradle", task, "--console=plain", "--no-daemon")
+                    ProcessBuilder("gradle", task, "--console=plain", "--no-daemon", "--build-cache")
                 }
             }
         } else {
