@@ -27,6 +27,7 @@ replay_pid*
 .npm_cache/
 */.npm_cache/*
 .gradle/
+.kotlin/
 # ignore intellij
 .idea/
 *.DS_Store

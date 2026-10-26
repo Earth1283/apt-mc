@@ -134,6 +134,7 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                 }
 
                 CompletableFuture.allOf(*futures.toTypedArray()).thenRun {
+                    packageManager.graphCache.invalidate()
                     if (yaml.contains("configs")) {
                         sendStatus(sender, plugin.getMessage("status.exporting-configs"))
                         val configs = yaml.getMapList("configs")
@@ -225,8 +226,12 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                 return
             }
             val data = Base64.getDecoder().decode(b64)
-            FileOutputStream(targetFile).use { fos ->
-                fos.write(data)
+            try {
+                FileOutputStream(targetFile).use { fos ->
+                    fos.write(data)
+                }
+            } finally {
+                packageManager.graphCache.invalidate()
             }
             sender.sendMessage(plugin.getMessage("status.downloaded", Placeholder.unparsed("arg", filename)))
             installedCount.incrementAndGet()

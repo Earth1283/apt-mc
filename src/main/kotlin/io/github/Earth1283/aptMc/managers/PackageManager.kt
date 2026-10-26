@@ -3,6 +3,7 @@ package io.github.Earth1283.aptMc.managers
 import com.google.gson.JsonObject
 import com.google.gson.reflect.TypeToken
 import io.github.Earth1283.aptMc.api.HttpClientProvider
+import io.github.Earth1283.aptMc.graph.PluginGraphCache
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -23,8 +24,10 @@ import java.util.logging.Logger
 class PackageManager(
     private val dataFolder: File,
     private val pluginsDir: File,
-    private val logger: Logger
+    private val logger: Logger,
+    graphCacheTtlMillis: Long = 30_000
 ) {
+    val graphCache = PluginGraphCache(pluginsDir, AsyncExecutor.POOL, graphCacheTtlMillis)
     private val cacheFile: File = File(dataFolder, "cache.json")
     private var cache: MutableMap<String, JsonObject> = HashMap()
 
@@ -168,6 +171,15 @@ class PackageManager(
 
     @Throws(IOException::class, InterruptedException::class)
     fun downloadFile(url: String, destDir: File, filename: String, size: Long, progressCallback: Consumer<Double>?, expectedSha1: String? = null) {
+        try {
+            downloadToFile(url, destDir, filename, size, progressCallback, expectedSha1)
+        } finally {
+            // Also expire after failed writes, which may have changed a destination JAR.
+            graphCache.invalidate()
+        }
+    }
+
+    private fun downloadToFile(url: String, destDir: File, filename: String, size: Long, progressCallback: Consumer<Double>?, expectedSha1: String?) {
         if (!destDir.exists()) destDir.mkdirs()
         val destPath = File(destDir, filename)
 

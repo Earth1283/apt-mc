@@ -3,6 +3,7 @@ package io.github.Earth1283.aptMc.commands
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.commands.sub.CompileCommand
 import io.github.Earth1283.aptMc.commands.sub.ExportCommand
+import io.github.Earth1283.aptMc.commands.sub.GraphCommand
 import io.github.Earth1283.aptMc.commands.sub.ImportCommand
 import io.github.Earth1283.aptMc.commands.sub.InfoCommand
 import io.github.Earth1283.aptMc.commands.sub.InstallCommand
@@ -23,7 +24,10 @@ import java.io.File
 import java.util.logging.Level
 
 class AptCommand(private val plugin: AptMc) : CommandExecutor, TabCompleter {
-    private val packageManager: PackageManager = PackageManager(plugin.dataFolder, plugin.dataFolder.parentFile, plugin.logger)
+    private val packageManager: PackageManager = PackageManager(
+        plugin.dataFolder, plugin.dataFolder.parentFile, plugin.logger,
+        plugin.config.getLong("graph.cache-seconds", 30).coerceIn(0, 3600) * 1000
+    )
     private var confirmationListener: ConfirmationListener? = null
     private lateinit var compileCommand: CompileCommand
     private val subCommands = HashMap<String, SubCommand>()
@@ -39,6 +43,7 @@ class AptCommand(private val plugin: AptMc) : CommandExecutor, TabCompleter {
 
     private fun registerCommands() {
         subCommands["list"] = ListCommand(plugin, packageManager)
+        subCommands["graph"] = GraphCommand(plugin, packageManager)
         subCommands["info"] = InfoCommand(plugin, packageManager)
         subCommands["update"] = UpdateCommand(plugin, packageManager)
         subCommands["search"] = SearchCommand(plugin, packageManager)
@@ -104,6 +109,7 @@ class AptCommand(private val plugin: AptMc) : CommandExecutor, TabCompleter {
         sender.sendMessage(plugin.getMessage("usage.search"))
         sender.sendMessage(plugin.getMessage("usage.info"))
         sender.sendMessage(plugin.getMessage("usage.list"))
+        sender.sendMessage(plugin.getMessage("usage.graph"))
         sender.sendMessage(plugin.getMessage("usage.update"))
         sender.sendMessage(plugin.getMessage("usage.export"))
         sender.sendMessage(plugin.getMessage("usage.import"))

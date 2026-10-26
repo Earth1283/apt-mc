@@ -18,6 +18,14 @@ source-priority:
   - hangar
   - github
 
+# Installed dependency graph. JAR scanning and rendering run asynchronously.
+graph:
+  # Recheck directory contents after this many seconds (0 = check on every request).
+  # Unchanged descriptors are reused; --refresh forces all descriptors to be reread.
+  cache-seconds: 30
+  page-size: 14
+  max-depth: 8
+
 # Export configuration
 export:
   # Mode: 'whitelist' (only include specified extensions) or 'blacklist' (exclude specified extensions)

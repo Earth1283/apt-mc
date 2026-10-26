@@ -45,6 +45,7 @@ class RemoveCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
         }
 
         if (target.delete()) {
+            packageManager.graphCache.invalidate()
             sender.sendMessage(plugin.getMessage("status.removing", Placeholder.unparsed("arg", pkg + " (" + target.name + ")")))
             sender.sendMessage(plugin.getMessage("status.removal-complete"))
         } else {

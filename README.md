@@ -8,6 +8,7 @@
 
 -   **📦 Install & Remove**: Easily install plugins by their Modrinth slug, Hangar slug, or GitHub repo (`user/repo`) and remove them by filename.
 -   **🔍 Search**: Search the Modrinth and Hangar databases for plugins directly from chat.
+-   **🌳 Dependency Graph**: Inspect installed plugins with `/apt graph`, including optional dependencies, missing requirements, runtime status, and Adventure hover tooltips. Scans are asynchronous, cached, and work offline.
 -   **🛡️ Dry Run**: Use the `--dry-run` flag with most commands to see what *would* happen without making any changes.
 -   **🔄 Upgrade System**: 
     -   `apt upgrade` checks all installed plugins against Modrinth.
@@ -38,6 +39,7 @@ Most commands support the `--dry-run` flag to simulate actions without modifying
 | `/apt remove <plugin>` | Removes a plugin JAR file. |
 | `/apt search <query>` | Searches Modrinth for plugins. |
 | `/apt list` | Lists installed plugins and their versions. |
+| `/apt graph [plugin] [--reverse] [--required-only] [--refresh] [--page N]` | Shows installed plugin dependency trees, with interactive details in chat. |
 | `/apt info <plugin>` | Shows detailed metadata, author, and dependencies. |
 | `/apt export [file] [--include-all] [--compress] [--no-configs]` | Exports state (plugins + configs) to a YAML manifest. |
 | `/apt import [file]` | Imports plugins and restores configurations from a manifest (`.yml` or `.zip`, auto-detected). |
@@ -49,6 +51,34 @@ Most commands support the `--dry-run` flag to simulate actions without modifying
 | `--include-all` | Embeds unrecognised (non-Modrinth) plugin jars as base64 into the manifest instead of just listing their names. Bundles arbitrary jars into the file — use at your own risk. |
 | `--compress` | Zips the manifest to `<file>.zip` instead of writing plain `.yml`. Reduces file size, especially with bundled configs/jars. |
 | `--no-configs` | Skips config bundling, exporting plugin versions only. |
+
+### Dependency graphs
+
+```text
+/apt graph
+/apt graph MyPlugin
+/apt graph MyPlugin --reverse
+/apt graph MyPlugin --required-only
+/apt graph --refresh
+/apt graph --page 2
+```
+
+Optional dependencies are visible by default. Missing required dependencies show `[missing!]`; absent optional integrations show `[optional] [absent]`. `--reverse` shows installed plugins that depend on the selected plugin (and can also inspect a missing dependency by name). `--required-only` hides optional relationships.
+
+Hover over a plugin to see its version, JAR filename, description, authors, dependency relationship, and runtime status. Clicking a name suggests its graph command; pagination links also suggest commands. Console output includes essential labels and page instructions without requiring hover support.
+
+The graph reads `plugin.yml` or `paper-plugin.yml` from JARs directly inside the plugins directory, without loading classes or contacting an API. Paper descriptors take precedence when both exist. It understands `provides` aliases and Paper bootstrap/server dependencies. Load-order declarations are shown separately in tooltips, rather than treated as dependencies. Plugins that are disabled or not loaded remain visible, and a differing runtime version is labeled explicitly. Unreadable descriptors and duplicate plugin names produce warnings. Runtime-only integrations that are not declared in metadata cannot appear in the graph; staged JARs in `update/` are not included.
+
+Scanning and graph rendering run on background workers. Metadata is cached by path, size, and modification time; the graph is reused for 30 seconds by default. Concurrent requests share a scan, and apt file changes invalidate the graph. After the cache expires, only changed JARs are reparsed. `--refresh` forces descriptor rereads, including replacements with unchanged size/timestamps. This cache lives in memory and starts empty after restart. Tab completion uses cached names without disk access.
+
+```yaml
+graph:
+  cache-seconds: 30 # 0 checks the directory on every request; maximum 3600
+  page-size: 14    # 5–40 rows per page
+  max-depth: 8    # 1–20 dependency levels
+```
+
+Cycles and repeated subtrees are labeled; rendering is capped at 2,000 tree rows. All graph labels, tooltip text, errors, and navigation messages are customizable under `graph` in `messages.yml`, with command help under `usage.graph`. Plugin metadata is inserted as literal text. Restart after changing graph settings or messages.
 
 ## Configuration
 

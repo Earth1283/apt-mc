@@ -160,9 +160,13 @@ class CompileCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand
 
             sendStatus(sender, plugin.getMessage("status.compile-copying",
                 Placeholder.unparsed("arg", selectedJar.name)))
-            Files.copy(selectedJar.toPath(),
-                File(packageManager.getPluginsDir(), selectedJar.name).toPath(),
-                StandardCopyOption.REPLACE_EXISTING)
+            try {
+                Files.copy(selectedJar.toPath(),
+                    File(packageManager.getPluginsDir(), selectedJar.name).toPath(),
+                    StandardCopyOption.REPLACE_EXISTING)
+            } finally {
+                packageManager.graphCache.invalidate()
+            }
             sender.sendMessage(plugin.getMessage("status.compile-complete"))
 
             if (!plugin.getConfig().getBoolean("compile.keep-repos-by-default", true)) {
