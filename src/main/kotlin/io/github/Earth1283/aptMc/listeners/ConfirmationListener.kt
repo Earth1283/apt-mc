@@ -1,5 +1,8 @@
 package io.github.Earth1283.aptMc.listeners
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
+import java.util.function.Consumer
+import java.util.concurrent.TimeUnit
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.commands.AptCommand
 import io.papermc.paper.event.player.AsyncChatEvent
@@ -25,13 +28,13 @@ class ConfirmationListener(
         val key = getKey(sender)
         pending[key] = file
 
-        plugin.server.scheduler.runTaskLater(plugin, Runnable {
+        plugin.server.asyncScheduler.runDelayed(plugin, Consumer<ScheduledTask> {
             val timedOut = pending.remove(key)
             if (timedOut != null) {
                 timedOut.delete()
                 sender.sendMessage(plugin.getMessage("errors.import-timeout"))
             }
-        }, 45 * 20L)
+        }, 45L, TimeUnit.SECONDS)
     }
 
     private fun getKey(sender: CommandSender): String {

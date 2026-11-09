@@ -1,5 +1,6 @@
 package io.github.Earth1283.aptMc.commands.sub
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
 import com.google.gson.JsonObject
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.commands.SubCommand
@@ -47,11 +48,11 @@ class ExportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
 
         sendStatus(sender, plugin.getMessage("status.exporting", Placeholder.unparsed("arg", outputFile.name)))
 
-        plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
+        plugin.server.asyncScheduler.runNow(plugin, Consumer<ScheduledTask> {
             val installed = packageManager.getInstalledPlugins()
             if (installed.isEmpty()) {
                 sender.sendMessage(plugin.getMessage("status.export-empty"))
-                return@Runnable
+                return@Consumer
             }
 
             val versions: Map<String, JsonObject>
@@ -59,7 +60,7 @@ class ExportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                 versions = resolveVersions(ArrayList(installed.values))
             } catch (e: Exception) {
                 sender.sendMessage(plugin.getMessage("status.export-failed", Placeholder.unparsed("error", "Failed to resolve versions: " + (e.message ?: ""))))
-                return@Runnable
+                return@Consumer
             }
 
             val yaml = YamlConfiguration()

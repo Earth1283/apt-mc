@@ -12,8 +12,8 @@ import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.Plugin
 import org.bukkit.plugin.PluginManager
-import org.bukkit.scheduler.BukkitScheduler
-import org.bukkit.scheduler.BukkitTask
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -24,6 +24,7 @@ import org.mockito.Mockito.*
 import java.io.File
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import java.util.function.Consumer
 import java.util.logging.Logger
 
 class GraphCommandTest {
@@ -45,8 +46,8 @@ class GraphCommandTest {
         }
         val server = mock(Server::class.java)
         val manager = mock(PluginManager::class.java)
-        val scheduler = mock(BukkitScheduler::class.java)
-        val task = mock(BukkitTask::class.java)
+        val scheduler = mock(GlobalRegionScheduler::class.java)
+        val task = mock(ScheduledTask::class.java)
         val sender = mock(CommandSender::class.java)
         val runtime = mock(Plugin::class.java)
         val metadata = mock(PluginMeta::class.java)
@@ -57,7 +58,7 @@ class GraphCommandTest {
         `when`(plugin.isEnabled).thenReturn(true)
         `when`(plugin.logger).thenReturn(Logger.getAnonymousLogger())
         `when`(server.pluginManager).thenReturn(manager)
-        `when`(server.scheduler).thenReturn(scheduler)
+        `when`(server.globalRegionScheduler).thenReturn(scheduler)
         `when`(runtime.name).thenReturn("Example")
         `when`(runtime.pluginMeta).thenReturn(metadata)
         `when`(runtime.isEnabled).thenReturn(true)
@@ -67,9 +68,10 @@ class GraphCommandTest {
             arrayOf(runtime)
         }
         doAnswer { invocation ->
-            mainTasks.add(invocation.getArgument(1))
+            val consumer = invocation.getArgument<Consumer<ScheduledTask>>(1)
+            mainTasks.add(Runnable { consumer.accept(task) })
             task
-        }.`when`(scheduler).runTask(eq(plugin), any(Runnable::class.java))
+        }.`when`(scheduler).run(eq(plugin), any<Consumer<ScheduledTask>>())
         doAnswer { invocation ->
             assertSame(mainThread, Thread.currentThread())
             delivered.add(invocation.getArgument(0))

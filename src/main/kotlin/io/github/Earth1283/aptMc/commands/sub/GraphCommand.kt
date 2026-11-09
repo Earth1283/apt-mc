@@ -1,5 +1,7 @@
 package io.github.Earth1283.aptMc.commands.sub
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
+import java.util.function.Consumer
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.commands.SubCommand
 import io.github.Earth1283.aptMc.graph.GraphOptions
@@ -41,7 +43,7 @@ class GraphCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(p
         // This command is read-only. --dry-run is equivalent to a normal inspection.
         packageManager.graphCache.get(options.refresh).thenCompose { graph ->
             val runtime = CompletableFuture<Map<String, PluginRuntimeState>>()
-            plugin.server.scheduler.runTask(plugin, Runnable {
+            plugin.server.globalRegionScheduler.run(plugin, Consumer<ScheduledTask> {
                 try {
                     runtime.complete(plugin.server.pluginManager.plugins.associate {
                         pluginKey(it.name) to PluginRuntimeState(it.pluginMeta.version, it.isEnabled)
@@ -65,7 +67,7 @@ class GraphCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(p
 
     private fun reply(sender: CommandSender, lines: List<Component>) {
         // Graphs always go to chat; action bars cannot hold a dependency tree.
-        if (plugin.isEnabled) plugin.server.scheduler.runTask(plugin, Runnable { lines.forEach { sender.sendMessage(it) } })
+        if (plugin.isEnabled) plugin.server.globalRegionScheduler.run(plugin, Consumer<ScheduledTask> { lines.forEach { sender.sendMessage(it) } })
     }
 
     override fun onTabComplete(sender: CommandSender, args: List<String>): List<String> {

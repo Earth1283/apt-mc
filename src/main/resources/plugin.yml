@@ -1,7 +1,8 @@
 name: apt-mc
-version: '1.5'
+version: '1.6'
 main: io.github.Earth1283.aptMc.AptMc
 api-version: '1.21'
+folia-supported: true
 description: The missing package manager for Minecraft
 load: STARTUP
 authors: [ Earth1283 ]

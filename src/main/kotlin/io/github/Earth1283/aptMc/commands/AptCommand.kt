@@ -1,5 +1,7 @@
 package io.github.Earth1283.aptMc.commands
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
+import java.util.function.Consumer
 import io.github.Earth1283.aptMc.AptMc
 import io.github.Earth1283.aptMc.commands.sub.CompileCommand
 import io.github.Earth1283.aptMc.commands.sub.ExportCommand
@@ -74,7 +76,7 @@ class AptCommand(private val plugin: AptMc) : CommandExecutor, TabCompleter {
         val subArgs = ArrayList(args.asList().subList(1, args.size))
         val dryRun = subArgs.removeIf { it.equals("--dry-run", ignoreCase = true) }
 
-        plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
+        plugin.server.asyncScheduler.runNow(plugin, Consumer<ScheduledTask> {
             try {
                 cmd.execute(sender, subArgs, dryRun)
             } catch (e: Exception) {

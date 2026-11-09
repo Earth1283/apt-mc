@@ -1,5 +1,7 @@
 package io.github.Earth1283.aptMc.commands.sub
 
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask
+import java.util.function.Consumer
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import io.github.Earth1283.aptMc.AptMc
@@ -70,7 +72,7 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
     }
 
     fun performImport(sender: CommandSender, file: File, deleteAfter: Boolean = false) {
-        plugin.server.scheduler.runTaskAsynchronously(plugin, Runnable {
+        plugin.server.asyncScheduler.runNow(plugin, Consumer<ScheduledTask> {
             try {
                 plugin.logger.info("Starting import process for " + file.name)
                 val yaml = loadManifest(file)
@@ -78,7 +80,7 @@ class ImportCommand(plugin: AptMc, packageManager: PackageManager) : SubCommand(
                     plugin.logger.warning("Manifest invalid (no plugins/configs): " + file.name)
                     sender.sendMessage(plugin.getMessage("errors.invalid-manifest"))
                     if (deleteAfter) file.delete()
-                    return@Runnable
+                    return@Consumer
                 }
 
                 plugin.logger.info("Manifest valid. Reading content...")
